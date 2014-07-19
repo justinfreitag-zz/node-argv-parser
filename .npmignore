@@ -1,0 +1,6 @@
+.npmignore
+.gitignore
+.travis.yml
+README.md
+node_modules/
+
