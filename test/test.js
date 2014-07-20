@@ -2,8 +2,6 @@
 
 var ArgvParser = require('..');
 
-console.log('M', module);
-
 var argv = {
   foo: {
     description: 'Test --foo',

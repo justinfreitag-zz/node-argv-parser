@@ -24,23 +24,19 @@ var OPTION_TYPES = [
   'number'
 ];
 
-function getMaxLength(propertyName, options) {
+function getMaxLength(property, options) {
   var maxLength = 0;
-  for (var name in options) {
-    if (options.hasOwnProperty(name)) {
-      var length = options[name][propertyName].length;
-      if (length > maxLength) {
-        maxLength = length;
-      }
+  Object.keys(options).forEach(function (name) {
+    var length = options[name][property].length;
+    if (length > maxLength) {
+      maxLength = length;
     }
-  }
-
+  });
   return maxLength;
 }
 
-function displayProperty(string, maxLength) {
-  var gap = 1 + maxLength - string.length;
-  return string + new Array(gap).join(' ');
+function fillOptionProperty(property, maxLength) {
+  return property + new Array(1 + maxLength - property.length).join(' ');
 }
 
 // TODO introduce colors
@@ -55,20 +51,19 @@ function showHelp(parser) {
   var usage = parser.usage || (process.argv[0] + ' [options]');
   out += 'Usage: ' + usage + '\n\n';
 
-  out += 'Options:\n\n';
-
   var options = parser.options;
   var longNameLength = getMaxLength('longName', options);
   var shortNameLength = getMaxLength('shortName', options);
 
+  out += 'Options:\n\n';
   Object.keys(options)
     .sort(function (a, b) {
       return a > b;
     })
     .forEach(function (name) {
       var value = options[name];
-      out += '  ' + displayProperty(value.shortName, shortNameLength);
-      out += '  ' + displayProperty(value.longName, longNameLength);
+      out += '  ' + fillOptionProperty(value.shortName, shortNameLength);
+      out += '  ' + fillOptionProperty(value.longName, longNameLength);
       if (value.description) {
         out += '    ' + value.description;
       }
@@ -78,62 +73,47 @@ function showHelp(parser) {
   console.log(out);
 }
 
-function validateProperties(option) {
-  var invalidProperties = [];
-  Object.keys(option).forEach(function (key) {
-    if (!(key in OPTION_PROPERTIES)) {
-      invalidProperties.push(key);
-    }
-  });
-
-  if (invalidProperties.length) {
-    throw new Error(
-      'Invalid ' + pluralize('property', invalidProperties.length) +
-      ' specified for \'' + option.name + '\': ' + invalidProperties.toString()
-    );
-  }
-}
-
-function validateShortName(shortOption, shortOptions) {
-  var option = shortOptions[shortOption.name];
-  if (option) {
-    throw new Error(
-      'Short name conflict between \'' + shortOption.name + '\' & \'' +
-      option.name + '\' options'
-    );
-  }
-}
-
-function validateType(option) {
-  if (OPTION_TYPES.indexOf(option.type) === -1) {
-    throw new Error(
-      'Invalid type \'' + option.type + '\' for \'' + option.name + '\''
-    );
-  }
-}
-
-function validatePropertyMix(option) {
-  if (option.default && option.required) {
-    throw new Error(
-      '\'default\' & \'required\' properties for \'' + option.name + '\''
-    );
-  }
-}
-
 function validateOptions(options) {
   var shortOptions = {};
 
   Object.keys(options).forEach(function (name) {
     var option = options[name];
 
-    validateShortName(option, shortOptions);
+    var shortOption = shortOptions[option.name];
+    if (shortOption) {
+      throw new Error(
+        'Short name conflict between \'' + shortOption.name + '\' & \'' +
+        option.name + '\' options'
+      );
+    }
     shortOptions[option.shortName] = option;
 
-    validatePropertyMix(option);
+    var invalidProperties = [];
+    Object.keys(option).forEach(function (key) {
+      if (!(key in OPTION_PROPERTIES)) {
+        invalidProperties.push(key);
+      }
+    });
 
-    validateProperties(option);
+    if (invalidProperties.length) {
+      throw new Error(
+        'Invalid ' + pluralize('property', invalidProperties.length) +
+        ' specified for \'' + option.name + '\': ' +
+        invalidProperties.toString()
+      );
+    }
 
-    validateType(option);
+    if (OPTION_TYPES.indexOf(option.type) === -1) {
+      throw new Error(
+        'Invalid type \'' + option.type + '\' for \'' + option.name + '\''
+      );
+    }
+
+    if (option.default && option.required) {
+      throw new Error(
+        '\'default\' & \'required\' properties for \'' + option.name + '\''
+      );
+    }
   });
 }
 
@@ -148,6 +128,26 @@ function shortCase(string) {
   return shortString.toLowerCase();
 }
 
+function createDefaults(options) {
+  var defaults = {};
+  Object.keys(options).forEach(function (name) {
+    var option = options[name];
+    if (option.default !== undefined || option.required) {
+      defaults[option.name] = option.default;
+    }
+ });
+  return defaults;
+}
+
+function createLookup(options, propertyName) {
+  var references = {};
+  Object.keys(options).forEach(function (name) {
+    var option = options[name];
+    references[option[propertyName]] = options[name];
+  });
+  return references;
+}
+
 function initialiseOptions(options) {
   Object.keys(options).forEach(function (name) {
     var option = options[name];
@@ -159,29 +159,25 @@ function initialiseOptions(options) {
     option.name = name;
 
     if (!option.longName) {
-      option.longName = '--' + paramCase(name);
+      option.longName = '--' + paramCase(option.name);
     }
-
-    /* jshint eqnull: true */
-    if (option.default === null && !option.type) {
-      option.type = 'boolean';
-    }
-
-    if (typeof option.default === 'boolean') {
-      option.type = 'boolean';
-    }
-
-    option.required = option.type && option.type !== 'boolean';
 
     if (option.shortName !== null) {
       option.shortName = '-' + shortCase(option.name);
     }
+
+    /* jshint eqnull: true */
+    if (!option.type && option.default != null) {
+      option.type = typeof option.default;
+    }
+
+    option.required = option.required && option.type !== 'boolean';
   });
 }
 
 function handleParseError(parser, error) {
   if (error) {
-    console.log(error.message);
+    console.log(error);
   }
   showHelp(parser);
   process.exit(!error);
@@ -202,22 +198,10 @@ function ArgvParser(options) {
   initialiseOptions(this.options);
   validateOptions(this.options);
 
-  this.longNames = {};
-  this.shortNames = {};
-  this.values = {};
-  for (var name in this.options) {
-    if (this.options.hasOwnProperty(name)) {
-      var option = this.options[name];
-      this.longNames[option.longName] = option;
-      this.shortNames[option.shortName] = option;
-      if (option.required) {
-        this.values[option.name] = undefined;
-      }
-      if (option.default) {
-        this.values[option.name] = option.default;
-      }
-    }
-  }
+  this.longNames = createLookup(this.options, 'longName');
+  this.shortNames = createLookup(this.options, 'shortName');
+
+  this.defaults = createDefaults(this.options);
 }
 
 function prepareArgv(argv) {
@@ -232,12 +216,7 @@ function prepareArgv(argv) {
     }
   }
 
-  return argv.map(function (arg) {
-    if (arg.indexOf('-')) {
-      return arg.split('=', 1);
-    }
-    return arg;
-  });
+  return argv;
 }
 
 function isInteger(n) {
@@ -265,7 +244,7 @@ function convertType(type, value) {
 }
 
 function parseValue(parser, value, type, arg) {
-  if ((value === undefined) || (value.indexOf('-') === 0)) {
+  if (value === undefined || (value.indexOf('-') === 0)) {
     return handleParseError(
       parser,
       'Missing \'' + type + '\' for argument: \'' + arg + '\''
@@ -282,26 +261,28 @@ function parseValue(parser, value, type, arg) {
   return value;
 }
 
-function checkForRequired(parser, values, options) {
-  for (var name in values) {
-    if (values.hasOwnProperty(name)) {
-      if (values[name] === undefined) {
-        return handleParseError(
-          parser,
-          'Expected argument: \'' + options[name].shortName + '\''
-        );
-      }
+function valuesRequired(values) {
+  return Object.keys(values).some(function (name) {
+    return values[name] === undefined;
+  });
+}
+
+function missingValues(options, values) {
+  var missing = [];
+  Object.keys(values).forEach(function (name) {
+    if (values[name] === undefined) {
+      missing.push(options[name].longName);
     }
-  }
+  });
+  return missing;
 }
 
 ArgvParser.prototype.parse = function (argv) {
-  argv = prepareArgv(argv);
-  var values = clone(this.values);
+  var values = clone(this.defaults);
+  values.argv = argv = prepareArgv(argv);
 
-  /* jshint boss: true */
-  var arg;
-  while (arg = argv.shift()) {
+  while (argv.length && valuesRequired(values)) {
+    var arg = argv.shift();
     var option = this.shortNames[arg] || this.longNames[arg];
     if (!option) {
       return handleParseError(this, 'Unknown argument: \'' + arg + '\'');
@@ -313,7 +294,11 @@ ArgvParser.prototype.parse = function (argv) {
     }
   }
 
-  checkForRequired(values, this.options);
+  if (valuesRequired(values)) {
+    return handleParseError(
+      this, 'Expected arguments: ' + missingValues(this.options, values)
+    );
+  }
 
   return values;
 };
