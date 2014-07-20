@@ -278,10 +278,12 @@ function missingValues(options, values) {
 }
 
 ArgvParser.prototype.parse = function (argv) {
+  /* jshint maxcomplexity: false */
+
   var values = clone(this.defaults);
   values.argv = argv = prepareArgv(argv);
 
-  while (argv.length && valuesRequired(values)) {
+  while (argv.length && !argv[0].indexOf('-')) {
     var arg = argv.shift();
     var option = this.shortNames[arg] || this.longNames[arg];
     if (!option) {
@@ -291,6 +293,9 @@ ArgvParser.prototype.parse = function (argv) {
       values[option.name] = true;
     } else {
       values[option.name] = parseValue(this, argv.shift(), option.type, arg);
+    }
+    if (option.name === 'help') {
+      return handleParseError(this);
     }
   }
 
