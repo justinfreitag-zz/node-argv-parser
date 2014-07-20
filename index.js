@@ -66,11 +66,10 @@ function showHelp(parser) {
     })
     .forEach(function (name) {
       var value = options[name];
-      out += '  ';
-      out += ' -' + displayProperty(value.shortName, shortNameLength);
-      out += ' --' + displayProperty(value.displayName, displayNameLength);
+      out += '  ' + displayProperty(value.shortName, shortNameLength);
+      out += '  ' + displayProperty(value.displayName, displayNameLength);
       if (value.description) {
-        out += '  ' + value.description;
+        out += '    ' + value.description;
       }
       out += '\n';
     });
@@ -144,7 +143,7 @@ function initialiseOptions(options) {
     option.name = name;
 
     if (!option.displayName) {
-      option.displayName = paramCase(name);
+      option.displayName = '--' + paramCase(name);
     }
 
     /* jshint eqnull: true */
@@ -159,7 +158,7 @@ function initialiseOptions(options) {
     option.required = option.type && option.type !== 'boolean';
 
     if (option.shortName !== null) {
-      option.shortName = shortCase(option.name);
+      option.shortName = '-' + shortCase(option.name);
     }
   });
 }
@@ -179,10 +178,14 @@ function ArgvParser(options) {
   initialiseOptions(this.options);
   validateOptions(this.options);
 
+  this.displayNames = {};
+  this.shortNames = {};
+
   for (var name in this.options) {
     if (this.options.hasOwnProperty(name)) {
-      // TODO
-      console.log(name);
+      var option = this.options[name];
+      this.displayNames[option.displayName] = option;
+      this.shortNames[option.shortName] = option;
     }
   }
 }
@@ -214,9 +217,10 @@ ArgvParser.prototype.parse = function (argv) {
   }
   var args = {};
   for (var i = 0; i < argv.length; i++) {
-    var option = this.options[argv[i]];
+    var name = argv[i];
+    var option = this.shortNames[name] || this.displayNames[name];
     if (!option) {
-      throw new Error('Invalid argument: ' + argv[i]);
+      throw new Error('Invalid argument: ' + name);
     }
   }
 
