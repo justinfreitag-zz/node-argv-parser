@@ -2,6 +2,8 @@
 
 var ArgvParser = require('..');
 
+console.log('M', module);
+
 var argv = {
   foo: {
     description: 'Test --foo',
@@ -20,6 +22,7 @@ var argv = {
     required: true
   }
 };
+
 
 it('should show help', function() {
   var parser = new ArgvParser(argv);
