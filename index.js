@@ -1,5 +1,6 @@
 'use strict';
 
+var clone = require('node-v8-clone').clone;
 var merge = require('merge');
 var paramCase = require('param-case');
 var pluralize = require('pluralize');
@@ -7,7 +8,7 @@ var pluralize = require('pluralize');
 // value denotes mandatory/non-mandatory
 var OPTION_PROPERTIES = {
   name: true,
-  displayName: false,
+  longName: false,
   description: true,
   shortName: false,
   type: false,
@@ -57,7 +58,7 @@ function showHelp(parser) {
   out += 'Options:\n\n';
 
   var options = parser.options;
-  var displayNameLength = getMaxLength('displayName', options);
+  var longNameLength = getMaxLength('longName', options);
   var shortNameLength = getMaxLength('shortName', options);
 
   Object.keys(options)
@@ -67,7 +68,7 @@ function showHelp(parser) {
     .forEach(function (name) {
       var value = options[name];
       out += '  ' + displayProperty(value.shortName, shortNameLength);
-      out += '  ' + displayProperty(value.displayName, displayNameLength);
+      out += '  ' + displayProperty(value.longName, longNameLength);
       if (value.description) {
         out += '    ' + value.description;
       }
@@ -77,47 +78,62 @@ function showHelp(parser) {
   console.log(out);
 }
 
+function validateProperties(option) {
+  var invalidProperties = [];
+  Object.keys(option).forEach(function (key) {
+    if (!(key in OPTION_PROPERTIES)) {
+      invalidProperties.push(key);
+    }
+  });
+
+  if (invalidProperties.length) {
+    throw new Error(
+      'Invalid ' + pluralize('property', invalidProperties.length) +
+      ' specified for \'' + option.name + '\': ' + invalidProperties.toString()
+    );
+  }
+}
+
+function validateShortName(shortOption, shortOptions) {
+  var option = shortOptions[shortOption.name];
+  if (option) {
+    throw new Error(
+      'Short name conflict between \'' + shortOption.name + '\' & \'' +
+      option.name + '\' options'
+    );
+  }
+}
+
+function validateType(option) {
+  if (OPTION_TYPES.indexOf(option.type) === -1) {
+    throw new Error(
+      'Invalid type \'' + option.type + '\' for \'' + option.name + '\''
+    );
+  }
+}
+
+function validatePropertyMix(option) {
+  if (option.default && option.required) {
+    throw new Error(
+      '\'default\' & \'required\' properties for \'' + option.name + '\''
+    );
+  }
+}
+
 function validateOptions(options) {
   var shortOptions = {};
 
   Object.keys(options).forEach(function (name) {
     var option = options[name];
 
-    var shortOption = shortOptions[option.shortName];
-    if (shortOption) {
-      throw new Error(
-        'Short name conflict between \'' + shortOption.name + '\' & \'' +
-        option.name + '\' options'
-      );
-    } else {
-      shortOptions[option.shortName] = option;
-    }
+    validateShortName(option, shortOptions);
+    shortOptions[option.shortName] = option;
 
-    if (option.default && option.required) {
-      throw new Error(
-        '\'default\' & \'required\' properties specified for \'' + name + '\''
-      );
-    }
+    validatePropertyMix(option);
 
-    var invalidProperties = [];
-    Object.keys(option).forEach(function (key) {
-      if (!(key in OPTION_PROPERTIES)) {
-        invalidProperties.push(key);
-      }
-    });
+    validateProperties(option);
 
-    if (invalidProperties.length) {
-      throw new Error(
-        'Invalid ' + pluralize('property', invalidProperties.length) +
-        ' specified for \'' + name + '\': ' + invalidProperties.toString()
-      );
-    }
-
-    if (OPTION_TYPES.indexOf(option.type) === -1) {
-      throw new Error(
-        'Invalid type \'' + option.type + '\' specified for \'' + name + '\''
-      );
-    }
+    validateType(option);
   });
 }
 
@@ -142,8 +158,8 @@ function initialiseOptions(options) {
 
     option.name = name;
 
-    if (!option.displayName) {
-      option.displayName = '--' + paramCase(name);
+    if (!option.longName) {
+      option.longName = '--' + paramCase(name);
     }
 
     /* jshint eqnull: true */
@@ -163,6 +179,14 @@ function initialiseOptions(options) {
   });
 }
 
+function handleParseError(parser, error) {
+  if (error) {
+    console.log(error.message);
+  }
+  showHelp(parser);
+  process.exit(!error);
+}
+
 var DEFAULT_OPTIONS = {
   help: {
     description: 'This help text',
@@ -178,53 +202,120 @@ function ArgvParser(options) {
   initialiseOptions(this.options);
   validateOptions(this.options);
 
-  this.displayNames = {};
+  this.longNames = {};
   this.shortNames = {};
-
+  this.values = {};
   for (var name in this.options) {
     if (this.options.hasOwnProperty(name)) {
       var option = this.options[name];
-      this.displayNames[option.displayName] = option;
+      this.longNames[option.longName] = option;
       this.shortNames[option.shortName] = option;
+      if (option.required) {
+        this.values[option.name] = undefined;
+      }
+      if (option.default) {
+        this.values[option.name] = option.default;
+      }
     }
   }
 }
 
-// TODO add domain to capture errors thrown
-function handleError(parser, error) {
-  if (error) {
-    console.log(error.message);
+function prepareArgv(argv) {
+  if (!argv) {
+    argv = process.argv;
   }
-  showHelp(parser);
-  process.exit(0);
-}
 
-function cleanArgv(argv) {
   for (var i = 0; i < argv.length; i++) {
     if ((argv[i] === module.parent.filename) || (argv[i] === '--')) {
-      return argv.slice(i + 1);
+      argv = argv.slice(i + 1);
+      break;
+    }
+  }
+
+  return argv.map(function (arg) {
+    if (arg.indexOf('-')) {
+      return arg.split('=', 1);
+    }
+    return arg;
+  });
+}
+
+function isInteger(n) {
+  return typeof n === 'number' && (n % 1 === 0);
+}
+
+function convertNumber(value) {
+  if (isInteger(value)) {
+    return parseInt(value);
+  }
+  return parseFloat(value);
+}
+
+function convertType(type, value) {
+  switch (type) {
+    case 'integer':
+      return parseInt(value, 10);
+    case 'float':
+      return parseFloat(value, 10);
+    case 'number':
+      return convertNumber(value);
+    default:
+      return value;
+  }
+}
+
+function parseValue(parser, value, type, arg) {
+  if ((value === undefined) || (value.indexOf('-') === 0)) {
+    return handleParseError(
+      parser,
+      'Missing \'' + type + '\' for argument: \'' + arg + '\''
+    );
+  }
+  try {
+    value = convertType(type, value);
+  } catch (error) {
+    return handleParseError(
+      parser,
+      'Expected \'' + type + '\' for argument: \'' + arg + '\''
+    );
+  }
+  return value;
+}
+
+function checkForRequired(parser, values, options) {
+  for (var name in values) {
+    if (values.hasOwnProperty(name)) {
+      if (values[name] === undefined) {
+        return handleParseError(
+          parser,
+          'Expected argument: \'' + options[name].shortName + '\''
+        );
+      }
     }
   }
 }
 
 ArgvParser.prototype.parse = function (argv) {
-  if (!argv) {
-    argv = cleanArgv(process.argv);
-  }
-  if (!argv.length) {
-    handleError(this);
-    return;
-  }
-  var args = {};
-  for (var i = 0; i < argv.length; i++) {
-    var name = argv[i];
-    var option = this.shortNames[name] || this.displayNames[name];
+  argv = prepareArgv(argv);
+  var values = clone(this.values);
+
+  /* jshint boss: true */
+  var arg;
+  while (arg = argv.shift()) {
+    var option = this.shortNames[arg] || this.longNames[arg];
     if (!option) {
-      throw new Error('Invalid argument: ' + name);
+      return handleParseError(this, 'Unknown argument: \'' + arg + '\'');
+    }
+    if (option.type === 'boolean') {
+      values[option.name] = true;
+    } else {
+      values[option.name] = parseValue(this, argv.shift(), option.type, arg);
     }
   }
 
-  return args;
+  checkForRequired(values, this.options);
+
+  return values;
 };
 
 module.exports = ArgvParser;
