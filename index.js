@@ -3,18 +3,18 @@
 var clone = require('node-v8-clone').clone;
 var merge = require('merge');
 var paramCase = require('param-case');
-var pluralize = require('pluralize');
+var util = require('util');
 
-// value denotes mandatory/non-mandatory
-var OPTION_PROPERTIES = {
-  name: true,
-  longName: false,
-  description: true,
-  shortName: false,
-  type: false,
-  required: false,
-  default: false
-};
+var OPTION_PROPERTIES = [
+  'id',
+  'shortId',
+  'longId',
+  'description',
+  'type',
+  'placeholder',
+  'required',
+  'default'
+];
 
 var OPTION_TYPES = [
   'string',
@@ -24,10 +24,32 @@ var OPTION_TYPES = [
   'number'
 ];
 
-function getMaxLength(property, options) {
+var MISSING_PROPERTIES = 'Missing properties for %s';
+var SHORT_ID_CONFLICT = 'Short ID conflict between %s and %s';
+var INVALID_PROPERTY = 'Invalid property in %s: %s';
+var INVALID_TYPE = 'Invalid type for %s';
+var DEFAULT_REQUIRED_MISMATCH = 'Default and required mismatch in %s';
+var DEFAULT_TYPE_MISMATCH = 'Default and type mismatch in %s';
+
+var MISSING_ARGUMENTS = 'Missing arguments: %s';
+var INVALID_ARGUMENT = 'Unknown argument %s';
+var MISSING_VALUE = 'Missing %s for argument %s';
+var INVALID_VALUE = 'Expecting %s for argument %s';
+
+var ARGUMENT_TERMINATOR = '--';
+
+function getMaxLength(propertyId, options, withPlaceholder) {
   var maxLength = 0;
-  Object.keys(options).forEach(function (name) {
-    var length = options[name][property].length;
+  Object.keys(options).forEach(function (id) {
+    var option = options[id];
+    var length = option[propertyId].length;
+    if (withPlaceholder && (option.type !== 'boolean')) {
+      length += option.placeholder.length + 3;
+      if (option.default) {
+        length += ('' + option.default).length;
+        console.log('length', length);
+      }
+    }
     if (length > maxLength) {
       maxLength = length;
     }
@@ -35,12 +57,11 @@ function getMaxLength(property, options) {
   return maxLength;
 }
 
-function fillOptionProperty(property, maxLength) {
+function fillProperty(property, maxLength) {
   return property + new Array(1 + maxLength - property.length).join(' ');
 }
 
-// TODO introduce colors
-function showHelp(parser) {
+function displayHelp(parser) {
   var out = '';
 
   if (parser.banner) {
@@ -48,122 +69,139 @@ function showHelp(parser) {
   }
   out += '\n';
 
-  var usage = parser.usage || (process.argv[0] + ' [options]');
+  var options = parser.options;
+  var usage = process.argv[0] + ' ';
+  Object.keys(options)
+    .sort(function (a, b) {
+      return a > b;
+    })
+    .forEach(function (id) {
+      var option = options[id];
+      if (option.required) {
+        usage += '\x1B[34m';
+        usage += option.shortId + ' ' + (option.placeholder || '') + ' ';
+        usage += '\x1B[39m';
+      }
+    });
+
+  usage += '[options]';
   out += 'Usage: ' + usage + '\n\n';
 
-  var options = parser.options;
-  var longNameLength = getMaxLength('longName', options);
-  var shortNameLength = getMaxLength('shortName', options);
+  var shortIdLength = getMaxLength('shortId', options);
+  var longIdLength = getMaxLength('longId', options, true);
 
   out += 'Options:\n\n';
   Object.keys(options)
     .sort(function (a, b) {
       return a > b;
     })
-    .forEach(function (name) {
-      var value = options[name];
-      out += '  ' + fillOptionProperty(value.shortName, shortNameLength);
-      out += '  ' + fillOptionProperty(value.longName, longNameLength);
-      if (value.description) {
-        out += '    ' + value.description;
+    .forEach(function (id) {
+      var option = options[id];
+      if (option.required) {
+        out += '\x1B[34m';
       }
-      out += '\n';
+      out += '  ' + fillProperty(option.shortId, shortIdLength);
+      var longId = option.longId;
+      if (option.type !== 'boolean') {
+        longId += ' ' + option.placeholder;
+        //if (option.default) {
+        //  longId += '\x1B[32m:' + option.default + '\x1B[39m';
+        //}
+      }
+      out += '  ' + fillProperty(longId, longIdLength);
+      if (option.description) {
+        out += '    ' + option.description;
+      }
+      out += '\x1B[39m\n';
     });
 
   console.log(out);
 }
 
-function validateOptions(options) {
+function checkOptions(options) {
   var shortOptions = {};
 
-  Object.keys(options).forEach(function (name) {
-    var option = options[name];
+  Object.keys(options).forEach(function (id) {
+    var option = options[id];
 
-    var shortOption = shortOptions[option.name];
+    var shortOption = shortOptions[id];
     if (shortOption) {
-      throw new Error(
-        'Short name conflict between \'' + shortOption.name + '\' & \'' +
-        option.name + '\' options'
-      );
+      throw new Error(util.format(SHORT_ID_CONFLICT, shortOption.id, id));
     }
-    shortOptions[option.shortName] = option;
+    shortOptions[option.shortId] = option;
 
-    var invalidProperties = [];
-    Object.keys(option).forEach(function (key) {
-      if (!(key in OPTION_PROPERTIES)) {
-        invalidProperties.push(key);
+    Object.keys(option).forEach(function (property) {
+      if (OPTION_PROPERTIES.indexOf(property) === -1) {
+        throw new Error(util.format(INVALID_PROPERTY, id, property));
       }
     });
 
-    if (invalidProperties.length) {
-      throw new Error(
-        'Invalid ' + pluralize('property', invalidProperties.length) +
-        ' specified for \'' + option.name + '\': ' +
-        invalidProperties.toString()
-      );
-    }
-
     if (OPTION_TYPES.indexOf(option.type) === -1) {
-      throw new Error(
-        'Invalid type \'' + option.type + '\' for \'' + option.name + '\''
-      );
+      throw new Error(util.format(INVALID_TYPE, option.type, id));
     }
 
-    if (option.default && option.required) {
-      throw new Error(
-        '\'default\' & \'required\' properties for \'' + option.name + '\''
-      );
+    if (option.default) {
+      if (option.required) {
+        throw new Error(util.format(DEFAULT_REQUIRED_MISMATCH, id));
+      }
+      if (typeof option.default !== option.type) {
+        throw new Error(util.format(DEFAULT_TYPE_MISMATCH, id));
+      }
     }
   });
 }
 
-function shortCase(string) {
-  var shortString = string[0];
-  for (var i = 1; i < string.length; i++) {
-    var c = string[i];
+function createShortId(id) {
+  var shortId = id[0];
+  for (var i = 1; i < id.length; i++) {
+    var c = id[i];
     if ((c >= 'A') && (c <= 'Z')) {
-      shortString += c;
+      shortId += c;
     }
   }
-  return shortString.toLowerCase();
+  return '-' + shortId.toLowerCase();
+}
+
+function createLongId(id) {
+  return '--' + paramCase(id);
 }
 
 function createDefaults(options) {
   var defaults = {};
-  Object.keys(options).forEach(function (name) {
-    var option = options[name];
-    if (option.default !== undefined || option.required) {
-      defaults[option.name] = option.default;
+  Object.keys(options).forEach(function (id) {
+    var option = options[id];
+    if (option.required || option.default !== undefined) {
+      defaults[id] = option.default;
     }
- });
+  });
   return defaults;
 }
 
-function createLookup(options, propertyName) {
+function createLookup(options, propertyId) {
   var references = {};
-  Object.keys(options).forEach(function (name) {
-    var option = options[name];
-    references[option[propertyName]] = options[name];
+  Object.keys(options).forEach(function (id) {
+    var option = options[id];
+    references[option[propertyId]] = option;
   });
   return references;
 }
 
-function initialiseOptions(options) {
-  Object.keys(options).forEach(function (name) {
-    var option = options[name];
+function prepareOptions(options) {
+  Object.keys(options).forEach(function (id) {
+    var option = options[id];
 
     if (!Object.keys(option).length) {
-      throw new Error('Missing properties for \'' + name + '\'');
+      throw new Error(util.format(MISSING_PROPERTIES, id));
     }
 
-    option.name = name;
+    option.id = id;
 
-    if (!option.longName) {
-      option.longName = '--' + paramCase(option.name);
+    if (!option.longId) {
+      option.longId = createLongId(id);
     }
 
-    if (option.shortName !== null) {
-      option.shortName = '-' + shortCase(option.name);
+    if (option.shortId !== null) {
+      option.shortId = createShortId(id);
     }
 
     /* jshint eqnull: true */
@@ -171,22 +209,23 @@ function initialiseOptions(options) {
       option.type = typeof option.default;
     }
 
-    option.required = option.required && option.type !== 'boolean';
+    if (!option.placeholder) {
+      option.placeholder = option.type.toUpperCase();
+    }
   });
 }
 
-function handleParseError(parser, error) {
+function handleError(parser, error) {
   if (error) {
-    console.log(error);
+    console.log('\n\x1B[31mERROR: ' + error + '\x1B[39m');
   }
-  showHelp(parser);
-  process.exit(!error);
+  displayHelp(parser);
+  process.exit(!!error);
 }
 
 var DEFAULT_OPTIONS = {
   help: {
     description: 'This help text',
-    type: 'boolean',
     required: false,
     default: false
   }
@@ -195,115 +234,80 @@ var DEFAULT_OPTIONS = {
 function ArgvParser(options) {
   this.options = merge(DEFAULT_OPTIONS, options);
 
-  initialiseOptions(this.options);
-  validateOptions(this.options);
+  prepareOptions(this.options);
+  checkOptions(this.options);
 
-  this.longNames = createLookup(this.options, 'longName');
-  this.shortNames = createLookup(this.options, 'shortName');
+  this.longIds = createLookup(this.options, 'longId');
+  this.shortIds = createLookup(this.options, 'shortId');
 
   this.defaults = createDefaults(this.options);
 }
 
-function prepareArgv(argv) {
+function prepareArguments(argv) {
   if (!argv) {
     argv = process.argv;
   }
-
   for (var i = 0; i < argv.length; i++) {
-    if ((argv[i] === module.parent.filename) || (argv[i] === '--')) {
+    if (
+      argv[i] === module.parent.filename || (argv[i] === ARGUMENT_TERMINATOR)
+    ) {
       argv = argv.slice(i + 1);
       break;
     }
   }
-
   return argv;
 }
 
-function isInteger(n) {
-  return typeof n === 'number' && (n % 1 === 0);
-}
-
-function convertNumber(value) {
-  if (isInteger(value)) {
-    return parseInt(value);
-  }
-  return parseFloat(value);
-}
-
-function convertType(type, value) {
-  switch (type) {
-    case 'integer':
-      return parseInt(value, 10);
-    case 'float':
-      return parseFloat(value, 10);
-    case 'number':
-      return convertNumber(value);
-    default:
-      return value;
+function checkValues(parser, values) {
+  var missing = [];
+  Object.keys(values).forEach(function (id) {
+    if (values[id] === undefined) {
+      missing.push(parser.options[id].longId);
+    }
+  });
+  if (missing.length) {
+    return handleError(parser, util.format(MISSING_ARGUMENTS, missing));
   }
 }
 
-function parseValue(parser, value, type, arg) {
+function parseValue(parser, value, option) {
   if (value === undefined || (value.indexOf('-') === 0)) {
-    return handleParseError(
-      parser,
-      'Missing \'' + type + '\' for argument: \'' + arg + '\''
+    return handleError(
+      parser, util.format(MISSING_VALUE, option.type, option.shortId)
     );
   }
-  try {
-    value = convertType(type, value);
-  } catch (error) {
-    return handleParseError(
-      parser,
-      'Expected \'' + type + '\' for argument: \'' + arg + '\''
+  if (option.type !== 'string') {
+    value = +value;
+  }
+  if (isNaN(value)) {
+    handleError(
+      parser, util.format(INVALID_VALUE, option.placeholder, option.id)
     );
   }
   return value;
 }
 
-function valuesRequired(values) {
-  return Object.keys(values).some(function (name) {
-    return values[name] === undefined;
-  });
-}
-
-function missingValues(options, values) {
-  var missing = [];
-  Object.keys(values).forEach(function (name) {
-    if (values[name] === undefined) {
-      missing.push(options[name].longName);
-    }
-  });
-  return missing;
-}
-
 ArgvParser.prototype.parse = function (argv) {
-  /* jshint maxcomplexity: false */
-
   var values = clone(this.defaults);
-  values.argv = argv = prepareArgv(argv);
+  values.argv = argv = prepareArguments(argv);
 
   while (argv.length && !argv[0].indexOf('-')) {
-    var arg = argv.shift();
-    var option = this.shortNames[arg] || this.longNames[arg];
+    var id = argv.shift();
+    var option = this.shortIds[id] || this.longIds[id];
     if (!option) {
-      return handleParseError(this, 'Unknown argument: \'' + arg + '\'');
+      return handleError(this, util.format(INVALID_ARGUMENT, id));
     }
     if (option.type === 'boolean') {
-      values[option.name] = true;
+      values[option.id] = true;
     } else {
-      values[option.name] = parseValue(this, argv.shift(), option.type, arg);
+      values[option.id] = parseValue(this, argv.shift(), option);
     }
-    if (option.name === 'help') {
-      return handleParseError(this);
+    if (values.help) {
+      return handleError(this);
     }
   }
 
-  if (valuesRequired(values)) {
-    return handleParseError(
-      this, 'Expected arguments: ' + missingValues(this.options, values)
-    );
-  }
+  checkValues(this, values);
 
   return values;
 };
