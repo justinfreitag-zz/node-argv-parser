@@ -343,3 +343,22 @@ it('should fail when adjacent argument specified', function() {
   });
 });
 
+it('should fail when missing required options', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'string',
+        required: true
+      },
+    }
+  };
+  var parser = new ArgvParser(config);
+  assert.throws(function () {
+    parser.parse('--foo'.split(' '));
+  });
+});
+

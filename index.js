@@ -1,7 +1,5 @@
 'use strict';
 
-/* jshint eqnull: true */
-
 var clone = require('node-v8-clone').clone;
 var help = require('./lib/help');
 var merge = require('merge');
@@ -45,7 +43,7 @@ var ID_CONFLICT = 'ID conflict between between \'%s\' and \'%s\'';
 var INVALID_TYPE = 'Invalid type \'%s\' for \'%s\'';
 var PROPERTY_MISMATCH = 'Property mismatch between \'%s\' & \'%s\' for \'%s\'';
 
-var MISSING_ARGUMENTS = 'Missing arguments \'%s\'';
+var MISSING_OPTIONS = 'Missing arguments \'%s\'';
 var INVALID_ARGUMENT = 'Unknown argument \'%s\' for \'%s\'';
 var INVALID_OPTION = 'Unknown option \'%s\'';
 var INVALID_CONDENSED_OPTION = 'Unknown option \'%s\' in \'%s\'';
@@ -76,6 +74,7 @@ function createLongId(id) {
 }
 
 function prepareShortId(option, shortIds) {
+  /* jshint eqnull: true */
   if (option.shortId == null) {
     option.shortId = createShortId(option.id, shortIds);
   }
@@ -87,6 +86,7 @@ function prepareShortId(option, shortIds) {
 }
 
 function prepareLongId(option, longIds) {
+  /* jshint eqnull: true */
   if (option.longId == null) {
     option.longId = createLongId(option.id);
   }
@@ -98,6 +98,7 @@ function prepareLongId(option, longIds) {
 }
 
 function prepareType(option) {
+  /* jshint eqnull: true */
   if (option.type == null && (option.value != null)) {
     option.type = typeof option.value;
   }
@@ -110,6 +111,7 @@ function prepareType(option) {
 }
 
 function prepareValue(option, values) {
+  /* jshint eqnull: true */
   if (option.required || (option.value != null)) {
     values[option.id] = option.value;
   }
@@ -135,7 +137,7 @@ function validateProperties(option, properties) {
 }
 
 function prepareOption(parser, id, option) {
-  option.id = id; // map camelCase ID
+  option.id = id;
   validateProperties(option, OPTION_PROPERTIES);
   prepareArgument(option, parser.optionValues);
   prepareShortId(option, parser.optionShortIds);
@@ -149,7 +151,7 @@ function prepareOptions(parser, options) {
 }
 
 function prepareOperand(parser, id, operand) {
-  operand.id = id; // map camelCase ID
+  operand.id = id;
   validateProperties(operand, OPERAND_PROPERTIES);
   prepareArgument(operand, parser.operandValues);
 }
@@ -174,23 +176,10 @@ function prepareArgv(argv) {
   return argv;
 }
 
-function checkResult(parser, result) {
-  var missing = [];
-  Object.keys(result).forEach(function (id) {
-    if (result[id] === undefined) {
-      missing.push(parser.options[id].longId);
-    }
-  });
-  if (missing.length) {
-    throw new Error(format(MISSING_ARGUMENTS, missing));
-  }
-}
-
 function parseSingleArgument(option, arg) {
   if (arg === undefined || (arg.indexOf('-') === 0)) {
     throw new Error(format(MISSING_VALUE, option.hint, option.shortId));
   }
-
   if (option.type === 'number') {
     arg = +arg;
     if (isNaN(arg)) {
@@ -199,7 +188,6 @@ function parseSingleArgument(option, arg) {
   } else if (option.type === 'boolean') {
     arg = arg.toLowerCase() === 'true';
   }
-
   return arg;
 }
 
@@ -233,11 +221,9 @@ function parseOption(option, argv, result) {
   if (!option) {
     throw new Error(format(INVALID_ARGUMENT, option, option.shortId));
   }
-
   if (option.type) {
     return parseArgument(option, argv, result);
   }
-
   return true;
 }
 
@@ -290,6 +276,19 @@ function parseToken(parser, token, argv, result) {
   }
 }
 
+// TODO add operand support
+function checkResult(parser, result) {
+  var missing = [];
+  Object.keys(result.options).forEach(function (id) {
+    if (result.options[id] === undefined) {
+      missing.push(parser.options[id].longId);
+    }
+  });
+  if (missing.length) {
+    throw new Error(format(MISSING_OPTIONS, missing));
+  }
+}
+
 function ArgvParser(config) {
   this.options = merge(true, DEFAULT_OPTIONS, config.options);
   this.optionLongIds = {};
@@ -328,14 +327,13 @@ ArgvParser.prototype.parse = function (argv) {
   }
 
   if (result.help) {
-    this.help();
+    return this.help();
   }
-
   if (result.version) {
-    this.version();
+    return this.version();
   }
 
-  //checkResult(this, result);
+  checkResult(this, result);
 
   return result;
 };
