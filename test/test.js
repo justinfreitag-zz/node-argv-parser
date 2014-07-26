@@ -54,7 +54,26 @@ it('should fail when long option missing -- prefix', function() {
   };
   var parser = new ArgvParser(config);
   assert.throws(function () {
-    parser.parse('-foo-bar --bar-foo bar'.split(' '));
+    console.log(parser.parse('-foo-bar --bar-foo bar'.split(' ')));
+  });
+});
+
+
+it('should fail when long option missing -- prefix', function() {
+  var config = {
+    options: {
+      fooBar: {
+        description: 'Test --fooBar',
+      },
+      barFoo: {
+        description: 'Test --barFoo',
+        type: 'string'
+      },
+    }
+  };
+  var parser = new ArgvParser(config);
+  assert.throws(function () {
+    console.log(parser.parse('-foo-bar --bar-foo bar'.split(' ')));
   });
 });
 
@@ -216,6 +235,44 @@ it('should handle mutiple arguments', function() {
   assert.deepEqual(result.options.bar, ['bar', 'foo']);
 });
 
+it('should handle mutiple comma-separated arguments', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'string',
+        multiple: true
+      }
+    }
+  };
+  var parser = new ArgvParser(config);
+  var result = parser.parse('-b bar,foo -f'.split(' '));
+  assert.equal(result.options.foo, true);
+  assert.deepEqual(result.options.bar, ['bar', 'foo']);
+});
+
+it('should handle mutiple separated arguments', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'string',
+        multiple: true
+      }
+    }
+  };
+  var parser = new ArgvParser(config);
+  var result = parser.parse('-b bar -f -b foo'.split(' '));
+  assert.equal(result.options.foo, true);
+  assert.deepEqual(result.options.bar, ['bar', 'foo']);
+});
+
 it('should handle mutiple flag with single argument', function() {
   var config = {
     options: {
@@ -271,7 +328,7 @@ it('should add interspersed values as operands', function() {
   assert.deepEqual(result.operands, [42, 'barfoo', '-foobar']);
 });
 
-it('should handle adjacent arguments', function() {
+it('should fail when adjacent argument specified', function() {
   var config = {
     options: {
       bar: {
@@ -281,7 +338,8 @@ it('should handle adjacent arguments', function() {
     }
   };
   var parser = new ArgvParser(config);
-  var result = parser.parse('-bfoo'.split(' '));
-  assert.equal(result.options.bar, 'foo');
+  assert.throws(function () {
+    parser.parse('-bfoo'.split(' '));
+  });
 });
 

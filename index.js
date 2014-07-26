@@ -216,21 +216,26 @@ function parseMultipleArguments(option, args, argv) {
   return args;
 }
 
-function parseArgument(option, argv) {
+function parseArgument(option, argv, result) {
   var arg = parseSingleArgument(option, argv.shift());
   if (option.multiple) {
-    arg = parseMultipleArguments(option, [arg], argv);
+    arg = arg.split(',');
+    var values = result.options[option.id];
+    if (values) {
+      arg = values.concat(arg);
+    }
+    arg = parseMultipleArguments(option, arg, argv);
   }
   return arg;
 }
 
-function parseOption(option, argv) {
+function parseOption(option, argv, result) {
   if (!option) {
     throw new Error(format(INVALID_ARGUMENT, option, option.shortId));
   }
 
   if (option.type) {
-    return parseArgument(option, argv);
+    return parseArgument(option, argv, result);
   }
 
   return true;
@@ -243,7 +248,7 @@ function parseOptions(args, shortIds, argv, result) {
     if (!option) {
       throw new Error(format(INVALID_CONDENSED_OPTION, arg, args));
     }
-    result.options[option.id] = parseOption(option, argv);
+    result.options[option.id] = parseOption(option, argv, result);
   }
 }
 
@@ -253,19 +258,19 @@ function parseLongOption(parser, token, argv, result) {
     if (!option) {
       throw new Error(format(INVALID_OPTION, token[1]));
     }
-    result.options[option.id] = parseOption(option, argv);
+    result.options[option.id] = parseOption(option, argv, result);
   }
 }
 
 function parseShortOption(parser, token, argv, result) {
   if (token.length > 2) {
-    parseOptions(token, parser.optionShortIds, argv, result);
+      parseOptions(token, parser.optionShortIds, argv, result);
   } else {
     var option = parser.optionShortIds[token[1]];
     if (!option) {
       throw new Error(format(INVALID_OPTION, token[1]));
     }
-    result.options[option.id] = parseOption(option, argv);
+    result.options[option.id] = parseOption(option, argv, result);
   }
 }
 
