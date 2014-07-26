@@ -1,256 +1,177 @@
 'use strict';
 
+/* jshint eqnull: true */
+
 var clone = require('node-v8-clone').clone;
+var help = require('./lib/help');
 var merge = require('merge');
 var paramCase = require('param-case');
-var util = require('util');
+var format = require('util').format;
 
 var OPTION_PROPERTIES = [
   'id',
-  'shortId',
   'longId',
+  'shortId',
+  'description',
+  'required',
+  'type',
+  'placeholder',
+  'value',
+  'multiple',
+  'parse',
+  'validate'
+];
+
+var ARGUMENT_TYPES = [
+  'string',
+  'boolean',
+  'number'
+];
+
+var OPERAND_PROPERTIES = [
+  'id',
   'description',
   'type',
   'placeholder',
   'required',
-  'default'
+  'value',
+  'multiple',
+  'parse',
+  'validate'
 ];
 
-var OPTION_TYPES = [
-  'string',
-  'boolean',
-  'integer',
-  'float',
-  'number'
-];
+var INVALID_PROPERTY = 'Unknown property \'%s\' for \'%s\'';
+var ID_CONFLICT = 'ID conflict between between \'%s\' and \'%s\'';
+var INVALID_TYPE = 'Invalid type \'%s\' for \'%s\'';
+var PROPERTY_MISMATCH = 'Property mismatch between \'%s\' & \'%s\' for \'%s\'';
 
-var MISSING_PROPERTIES = 'Missing properties for %s';
-var SHORT_ID_CONFLICT = 'Short ID conflict between %s and %s';
-var INVALID_PROPERTY = 'Invalid property in %s: %s';
-var INVALID_TYPE = 'Invalid type for %s';
-var DEFAULT_REQUIRED_MISMATCH = 'Default and required mismatch in %s';
-var DEFAULT_TYPE_MISMATCH = 'Default and type mismatch in %s';
+var MISSING_ARGUMENTS = 'Missing arguments \'%s\'';
+var INVALID_ARGUMENT = 'Unknown argument \'%s\' for \'%s\'';
+var MISSING_VALUE = 'Missing \'%s\' for argument \'%s\'';
+var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
 
-var MISSING_ARGUMENTS = 'Missing arguments: %s';
-var INVALID_ARGUMENT = 'Unknown argument %s';
-var MISSING_VALUE = 'Missing %s for argument %s';
-var INVALID_VALUE = 'Expecting %s for argument %s';
-
-var ARGUMENT_TERMINATOR = '--';
-
-function getMaxLength(propertyId, options, withPlaceholder) {
-  var maxLength = 0;
-  Object.keys(options).forEach(function (id) {
-    var option = options[id];
-    var length = option[propertyId].length;
-    if (withPlaceholder && (option.type !== 'boolean')) {
-      length += option.placeholder.length + 3;
-      if (option.default) {
-        length += ('' + option.default).length;
-        console.log('length', length);
-      }
-    }
-    if (length > maxLength) {
-      maxLength = length;
-    }
-  });
-  return maxLength;
-}
-
-function fillProperty(property, maxLength) {
-  return property + new Array(1 + maxLength - property.length).join(' ');
-}
-
-function displayHelp(parser) {
-  var out = '';
-
-  if (parser.banner) {
-    out += parser.banner + '\n';
-  }
-  out += '\n';
-
-  var options = parser.options;
-  var usage = process.argv[0] + ' ';
-  Object.keys(options)
-    .sort(function (a, b) {
-      return a > b;
-    })
-    .forEach(function (id) {
-      var option = options[id];
-      if (option.required) {
-        usage += '\x1B[34m';
-        usage += option.shortId + ' ' + (option.placeholder || '') + ' ';
-        usage += '\x1B[39m';
-      }
-    });
-
-  usage += '[options]';
-  out += 'Usage: ' + usage + '\n\n';
-
-  var shortIdLength = getMaxLength('shortId', options);
-  var longIdLength = getMaxLength('longId', options, true);
-
-  out += 'Options:\n\n';
-  Object.keys(options)
-    .sort(function (a, b) {
-      return a > b;
-    })
-    .forEach(function (id) {
-      var option = options[id];
-      if (option.required) {
-        out += '\x1B[34m';
-      }
-      out += '  ' + fillProperty(option.shortId, shortIdLength);
-      var longId = option.longId;
-      if (option.type !== 'boolean') {
-        longId += ' ' + option.placeholder;
-        //if (option.default) {
-        //  longId += '\x1B[32m:' + option.default + '\x1B[39m';
-        //}
-      }
-      out += '  ' + fillProperty(longId, longIdLength);
-      if (option.description) {
-        out += '    ' + option.description;
-      }
-      out += '\x1B[39m\n';
-    });
-
-  console.log(out);
-}
-
-function checkOptions(options) {
-  var shortOptions = {};
-
-  Object.keys(options).forEach(function (id) {
-    var option = options[id];
-
-    var shortOption = shortOptions[id];
-    if (shortOption) {
-      throw new Error(util.format(SHORT_ID_CONFLICT, shortOption.id, id));
-    }
-    shortOptions[option.shortId] = option;
-
-    Object.keys(option).forEach(function (property) {
-      if (OPTION_PROPERTIES.indexOf(property) === -1) {
-        throw new Error(util.format(INVALID_PROPERTY, id, property));
-      }
-    });
-
-    if (OPTION_TYPES.indexOf(option.type) === -1) {
-      throw new Error(util.format(INVALID_TYPE, option.type, id));
-    }
-
-    if (option.default) {
-      if (option.required) {
-        throw new Error(util.format(DEFAULT_REQUIRED_MISMATCH, id));
-      }
-      if (typeof option.default !== option.type) {
-        throw new Error(util.format(DEFAULT_TYPE_MISMATCH, id));
-      }
-    }
-  });
-}
-
-function createShortId(id) {
-  var shortId = id[0];
-  for (var i = 1; i < id.length; i++) {
-    var c = id[i];
-    if ((c >= 'A') && (c <= 'Z')) {
-      shortId += c;
-    }
-  }
-  return '-' + shortId.toLowerCase();
-}
-
-function createLongId(id) {
-  return '--' + paramCase(id);
-}
-
-function createDefaults(options) {
-  var defaults = {};
-  Object.keys(options).forEach(function (id) {
-    var option = options[id];
-    if (option.required || option.default !== undefined) {
-      defaults[id] = option.default;
-    }
-  });
-  return defaults;
-}
-
-function createLookup(options, propertyId) {
-  var references = {};
-  Object.keys(options).forEach(function (id) {
-    var option = options[id];
-    references[option[propertyId]] = option;
-  });
-  return references;
-}
-
-function prepareOptions(options) {
-  Object.keys(options).forEach(function (id) {
-    var option = options[id];
-
-    if (!Object.keys(option).length) {
-      throw new Error(util.format(MISSING_PROPERTIES, id));
-    }
-
-    option.id = id;
-
-    if (!option.longId) {
-      option.longId = createLongId(id);
-    }
-
-    if (option.shortId !== null) {
-      option.shortId = createShortId(id);
-    }
-
-    /* jshint eqnull: true */
-    if (!option.type && option.default != null) {
-      option.type = typeof option.default;
-    }
-
-    if (!option.placeholder) {
-      option.placeholder = option.type.toUpperCase();
-    }
-  });
-}
-
-function handleError(parser, error) {
-  if (error) {
-    console.log('\n\x1B[31mERROR: ' + error + '\x1B[39m');
-  }
-  displayHelp(parser);
-  process.exit(!!error);
-}
+var OPTION_TERMINATOR = '--';
 
 var DEFAULT_OPTIONS = {
   help: {
-    description: 'This help text',
-    required: false,
-    default: false
+    description: 'This help text'
+  },
+  version: {
+    description: 'Show utility version information'
   }
 };
 
-function ArgvParser(options) {
-  this.options = merge(DEFAULT_OPTIONS, options);
-
-  prepareOptions(this.options);
-  checkOptions(this.options);
-
-  this.longIds = createLookup(this.options, 'longId');
-  this.shortIds = createLookup(this.options, 'shortId');
-
-  this.defaults = createDefaults(this.options);
+function createShortId(id, shortIds) {
+  var firstChar = id[0];
+  if (!shortIds[firstChar]) {
+    return firstChar;
+  }
+  return firstChar.toUpperCase();
 }
 
-function prepareArguments(argv) {
+function createLongId(id) {
+  return paramCase(id);
+}
+
+function prepareShortId(option, shortIds) {
+  if (option.shortId == null) {
+    option.shortId = createShortId(option.id, shortIds);
+  }
+  var existing = shortIds[option.shortId];
+  if (existing != null) {
+    throw new Error(format(ID_CONFLICT, existing.id, option.id));
+  }
+  shortIds[option.shortId] = option;
+}
+
+function prepareLongId(option, longIds) {
+  if (option.longId == null) {
+    option.longId = createLongId(option.id);
+  }
+  var existing = longIds[option.longId];
+  if (existing != null) {
+    throw new Error(format(ID_CONFLICT, existing.id, option.id));
+  }
+  longIds[option.longId] = option;
+}
+
+function prepareType(option) {
+  if (option.type == null && (option.value != null)) {
+    option.type = typeof option.value;
+  }
+  if (option.type && (ARGUMENT_TYPES.indexOf(option.type) === -1)) {
+    throw new Error(format(INVALID_TYPE, option.type, option.id));
+  }
+}
+
+function prepareValue(option, values) {
+  if (option.required || (option.value != null)) {
+    values[option.id] = option.value;
+  }
+  if (option.required && (option.value != null))  {
+    throw new Error(format(PROPERTY_MISMATCH, 'required', 'value', option.id));
+  }
+  if (option.value != null && (typeof option.value !== option.type)) {
+    throw new Error(format(PROPERTY_MISMATCH, 'value', 'type', option.id));
+  }
+}
+
+function prepareOption(option, refs) {
+  Object.keys(option).forEach(function (property) {
+    if (OPTION_PROPERTIES.indexOf(property) === -1) {
+      throw new Error(format(INVALID_PROPERTY, property, option.id));
+    }
+  });
+
+  prepareShortId(option, refs.shortIds);
+  prepareLongId(option, refs.longIds);
+  prepareType(option);
+  prepareValue(option, refs.values);
+}
+
+function prepareOptions(options, refs) {
+  options = merge(DEFAULT_OPTIONS, options || {});
+
+  Object.keys(options).forEach(function (id) {
+    var option = options[id];
+
+    option.id = id; // map camelCase ID
+
+    prepareOption(option, refs);
+  });
+
+  return options;
+}
+
+function prepareOperand(operand, refs) {
+  Object.keys(operand).forEach(function (property) {
+    if (OPERAND_PROPERTIES.indexOf(property) === -1) {
+      throw new Error(format(INVALID_PROPERTY, property, operand.id));
+    }
+  });
+
+  prepareType(operand);
+  prepareValue(operand, refs.values);
+}
+
+function prepareOperands(operands, refs) {
+  Object.keys(operands).forEach(function (id) {
+    var operand = operands[id];
+
+    operand.id = id; // map camelCase ID
+
+    prepareOperand(operand, refs);
+  });
+
+  return operands;
+}
+
+function prepareArgv(argv) {
   if (!argv) {
     argv = process.argv;
   }
   for (var i = 0; i < argv.length; i++) {
-    if (
-      argv[i] === module.parent.filename || (argv[i] === ARGUMENT_TERMINATOR)
-    ) {
+    if (argv[i] === module.parent.filename || (argv[i] === OPTION_TERMINATOR)) {
       argv = argv.slice(i + 1);
       break;
     }
@@ -258,58 +179,138 @@ function prepareArguments(argv) {
   return argv;
 }
 
-function checkValues(parser, values) {
+function checkResult(parser, result) {
   var missing = [];
-  Object.keys(values).forEach(function (id) {
-    if (values[id] === undefined) {
+  Object.keys(result).forEach(function (id) {
+    if (result[id] === undefined) {
       missing.push(parser.options[id].longId);
     }
   });
   if (missing.length) {
-    return handleError(parser, util.format(MISSING_ARGUMENTS, missing));
+    throw new Error(format(MISSING_ARGUMENTS, missing));
   }
 }
 
-function parseValue(parser, value, option) {
-  if (value === undefined || (value.indexOf('-') === 0)) {
-    return handleError(
-      parser, util.format(MISSING_VALUE, option.type, option.shortId)
-    );
+function parseSingleArg(option, arg, fail) {
+  if (arg === undefined || (arg.indexOf('-') === 0)) {
+    if (fail) {
+      throw new Error(format(MISSING_VALUE, option.shortId));
+    }
+    return;
   }
+
   if (option.type !== 'string') {
-    value = +value;
+    arg = +arg;
+    if (isNaN(arg)) {
+      throw new Error(format(INVALID_VALUE, option.placeholder, option.id));
+    }
   }
-  if (isNaN(value)) {
-    handleError(
-      parser, util.format(INVALID_VALUE, option.placeholder, option.id)
-    );
-  }
-  return value;
+  return arg;
 }
+
+function parseMultipleArg(option, arg, argv) {
+  var args = [arg];
+  while ((arg = argv.shift())) {
+    arg = parseSingleArg(option, arg, false);
+    if (arg !== undefined) {
+      args.push(arg);
+    } else {
+      argv.unshift(arg);
+      break;
+    }
+  }
+  return args;
+}
+
+function parseArg(option, arg, argv) {
+  arg = parseSingleArg(option, argv.shift(), true);
+  if (option.multiple) {
+    arg = parseMultipleArg(option, arg, argv);
+  }
+  return arg;
+}
+
+function parseOption(option, argv, result) {
+  if (!option) {
+    throw new Error(format(INVALID_ARGUMENT, option, option.shortId));
+  }
+  var arg = true;
+  if (option.type) {
+    arg = parseArg(option, arg, argv);
+  }
+  result.options[option.id] = arg;
+}
+
+function parseArgument(arg, argv, result, optionRefs) {
+  if (arg.indexOf('--') === 0) {
+    if (arg.length > 2) {
+      parseOption(optionRefs.longIds[arg.substring(2)], argv, result);
+    } else {
+      // TODO operands
+    }
+  } else if (arg.indexOf('-') === 0) {
+    if (arg.length > 2) {
+      parseShortOptions(arg, optionRefs.shortIds, argv, result);
+    } else {
+      parseOption(optionRefs.shortIds[arg[1]], argv, result);
+    }
+  } else {
+    // TODO operands
+  }
+}
+
+function parseShortOptions(args, shortIds, argv, result) {
+  for (var i = 1; i < args.length; i++) {
+    var option = shortIds[args[i]];
+    parseOption(option, argv, result);
+  }
+}
+
+function ArgvParser(config) {
+  this.optionRefs = {
+    longIds: {},
+    shortIds: {},
+    values: {}
+  };
+  this.options = prepareOptions(config.options, this.optionRefs);
+
+  this.operandRefs = {
+    values: {}
+  };
+  this.operands = prepareOperands(config.operands, this.operandRefs);
+}
+
+ArgvParser.prototype.help = function (stream) {
+  help(this, stream);
+};
+
+ArgvParser.prototype.version = function (stream) {
+  stream.write(this.version);
+};
 
 ArgvParser.prototype.parse = function (argv) {
-  var values = clone(this.defaults);
-  values.argv = argv = prepareArguments(argv);
+  var optionRefs = this.optionRefs;
+  var operandRefs = this.operandRefs;
+  var result = {
+    options: clone(optionRefs.values),
+    operands: clone(operandRefs.values)
+  };
 
-  while (argv.length && !argv[0].indexOf('-')) {
-    var id = argv.shift();
-    var option = this.shortIds[id] || this.longIds[id];
-    if (!option) {
-      return handleError(this, util.format(INVALID_ARGUMENT, id));
-    }
-    if (option.type === 'boolean') {
-      values[option.id] = true;
-    } else {
-      values[option.id] = parseValue(this, argv.shift(), option);
-    }
-    if (values.help) {
-      return handleError(this);
-    }
+  var arg;
+  // TODO add support for operands
+  while ((arg = argv.shift())) {
+    parseArgument(arg, argv, result, optionRefs);
+  }
+  if (result.help) {
+    this.help();
+  }
+  if (result.version) {
+    this.version();
   }
 
-  checkValues(this, values);
+  checkResult(this, result);
 
-  return values;
+  return result;
 };
 
 module.exports = ArgvParser;
