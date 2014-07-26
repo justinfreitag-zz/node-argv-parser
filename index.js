@@ -15,7 +15,7 @@ var OPTION_PROPERTIES = [
   'description',
   'required',
   'type',
-  'placeholder',
+  'hint',
   'value',
   'multiple',
   'parse',
@@ -32,7 +32,7 @@ var OPERAND_PROPERTIES = [
   'id',
   'description',
   'type',
-  'placeholder',
+  'hint',
   'required',
   'value',
   'multiple',
@@ -98,6 +98,9 @@ function prepareLongId(option, longIds) {
 function prepareType(option) {
   if (option.type == null && (option.value != null)) {
     option.type = typeof option.value;
+  }
+  if (option.type && !option.hint) {
+    option.hint = option.type.toUpperCase();
   }
   if (option.type && (ARGUMENT_TYPES.indexOf(option.type) === -1)) {
     throw new Error(format(INVALID_TYPE, option.type, option.id));
@@ -194,26 +197,29 @@ function checkResult(parser, result) {
 function parseSingleArg(option, arg, fail) {
   if (arg === undefined || (arg.indexOf('-') === 0)) {
     if (fail) {
-      throw new Error(format(MISSING_VALUE, option.shortId));
+      throw new Error(format(MISSING_VALUE, option.hint, option.shortId));
     }
     return;
   }
 
-  if (option.type !== 'string') {
+  if (option.type === 'number') {
     arg = +arg;
     if (isNaN(arg)) {
-      throw new Error(format(INVALID_VALUE, option.placeholder, option.id));
+      throw new Error(format(INVALID_VALUE, option.hint, option.id));
     }
+  } else if (option.type === 'boolean') {
+    arg = arg.toLowerCase() === 'true';
   }
+
   return arg;
 }
 
 function parseMultipleArg(option, arg, argv) {
   var args = [arg];
   while ((arg = argv.shift())) {
-    arg = parseSingleArg(option, arg, false);
-    if (arg !== undefined) {
-      args.push(arg);
+    var value = parseSingleArg(option, arg, false);
+    if (value !== undefined) {
+      args.push(value);
     } else {
       argv.unshift(arg);
       break;
@@ -230,10 +236,29 @@ function parseArg(option, arg, argv) {
   return arg;
 }
 
+
+function parseToken(token, argv, result, refs) {
+  if (token.indexOf('--') === 0) {
+    if (token.length > 2) {
+      parseOption(refs.longIds[token.substring(2)], argv, result);
+    }
+  } else if (token.indexOf('-') === 0) {
+    var option = refs.shortIds[token[1]];
+    if (token.length > 2) {
+      parseOptions(token, refs.shortIds, argv, result);
+    } else {
+      parseOption(option, argv, result);
+    }
+  } else {
+    result.operands.push(token);
+  }
+}
+
 function parseOption(option, argv, result) {
   if (!option) {
     throw new Error(format(INVALID_ARGUMENT, option, option.shortId));
   }
+
   var arg = true;
   if (option.type) {
     arg = parseArg(option, arg, argv);
@@ -241,25 +266,7 @@ function parseOption(option, argv, result) {
   result.options[option.id] = arg;
 }
 
-function parseArgument(arg, argv, result, optionRefs) {
-  if (arg.indexOf('--') === 0) {
-    if (arg.length > 2) {
-      parseOption(optionRefs.longIds[arg.substring(2)], argv, result);
-    } else {
-      // TODO operands
-    }
-  } else if (arg.indexOf('-') === 0) {
-    if (arg.length > 2) {
-      parseShortOptions(arg, optionRefs.shortIds, argv, result);
-    } else {
-      parseOption(optionRefs.shortIds[arg[1]], argv, result);
-    }
-  } else {
-    // TODO operands
-  }
-}
-
-function parseShortOptions(args, shortIds, argv, result) {
+function parseOptions(args, shortIds, argv, result) {
   for (var i = 1; i < args.length; i++) {
     var option = shortIds[args[i]];
     parseOption(option, argv, result);
@@ -289,17 +296,19 @@ ArgvParser.prototype.version = function (stream) {
 };
 
 ArgvParser.prototype.parse = function (argv) {
+  argv = prepareArgv(argv);
+
   var optionRefs = this.optionRefs;
   var operandRefs = this.operandRefs;
   var result = {
     options: clone(optionRefs.values),
-    operands: clone(operandRefs.values)
+    operands: []//clone(operandRefs.values)
   };
 
   var arg;
   // TODO add support for operands
   while ((arg = argv.shift())) {
-    parseArgument(arg, argv, result, optionRefs);
+    parseToken(arg, argv, result, optionRefs);
   }
   if (result.help) {
     this.help();
@@ -308,7 +317,7 @@ ArgvParser.prototype.parse = function (argv) {
     this.version();
   }
 
-  checkResult(this, result);
+  //checkResult(this, result);
 
   return result;
 };
