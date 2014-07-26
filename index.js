@@ -119,54 +119,43 @@ function prepareValue(option, values) {
   }
 }
 
-function prepareOption(option, refs) {
+function prepareArgument(option, values) {
+  prepareType(option);
+  prepareValue(option, values);
+}
+
+function validateProperties(option, properties) {
   Object.keys(option).forEach(function (property) {
-    if (OPTION_PROPERTIES.indexOf(property) === -1) {
+    if (properties.indexOf(property) === -1) {
       throw new Error(format(INVALID_PROPERTY, property, option.id));
     }
   });
-
-  prepareShortId(option, refs.shortIds);
-  prepareLongId(option, refs.longIds);
-  prepareType(option);
-  prepareValue(option, refs.values);
 }
 
-function prepareOptions(options, refs) {
-  options = merge(DEFAULT_OPTIONS, options || {});
+function prepareOption(parser, id, option) {
+  option.id = id; // map camelCase ID
+  validateProperties(option, OPTION_PROPERTIES);
+  prepareArgument(option, parser.optionValues);
+  prepareShortId(option, parser.optionShortIds);
+  prepareLongId(option, parser.optionLongIds);
+}
 
+function prepareOptions(parser, options) {
   Object.keys(options).forEach(function (id) {
-    var option = options[id];
-
-    option.id = id; // map camelCase ID
-
-    prepareOption(option, refs);
+    prepareOption(parser, id, options[id]);
   });
-
-  return options;
 }
 
-function prepareOperand(operand, refs) {
-  Object.keys(operand).forEach(function (property) {
-    if (OPERAND_PROPERTIES.indexOf(property) === -1) {
-      throw new Error(format(INVALID_PROPERTY, property, operand.id));
-    }
-  });
-
-  prepareType(operand);
-  prepareValue(operand, refs.values);
+function prepareOperand(parser, id, operand) {
+  operand.id = id; // map camelCase ID
+  validateProperties(operand, OPERAND_PROPERTIES);
+  prepareArgument(operand, parser.operandValues);
 }
 
-function prepareOperands(operands, refs) {
+function prepareOperands(parser, operands) {
   Object.keys(operands).forEach(function (id) {
-    var operand = operands[id];
-
-    operand.id = id; // map camelCase ID
-
-    prepareOperand(operand, refs);
+    prepareOperand(parser, id, operands[id]);
   });
-
-  return operands;
 }
 
 function prepareArgv(argv) {
@@ -194,12 +183,9 @@ function checkResult(parser, result) {
   }
 }
 
-function parseSingleArg(option, arg, fail) {
+function parseSingleArgument(option, arg) {
   if (arg === undefined || (arg.indexOf('-') === 0)) {
-    if (fail) {
-      throw new Error(format(MISSING_VALUE, option.hint, option.shortId));
-    }
-    return;
+    throw new Error(format(MISSING_VALUE, option.hint, option.shortId));
   }
 
   if (option.type === 'number') {
@@ -214,13 +200,12 @@ function parseSingleArg(option, arg, fail) {
   return arg;
 }
 
-function parseMultipleArg(option, arg, argv) {
-  var args = [arg];
+function parseMultipleArguments(option, args, argv) {
+  var arg;
   while ((arg = argv.shift())) {
-    var value = parseSingleArg(option, arg, false);
-    if (value !== undefined) {
-      args.push(value);
-    } else {
+    try {
+      args.push(parseSingleArgument(option, arg));
+    } catch (error) {
       argv.unshift(arg);
       break;
     }
@@ -228,63 +213,67 @@ function parseMultipleArg(option, arg, argv) {
   return args;
 }
 
-function parseArg(option, arg, argv) {
-  arg = parseSingleArg(option, argv.shift(), true);
+function parseArgument(option, argv) {
+  var arg = parseSingleArgument(option, argv.shift());
   if (option.multiple) {
-    arg = parseMultipleArg(option, arg, argv);
+    arg = parseMultipleArguments(option, [arg], argv);
   }
   return arg;
 }
 
+function parseOption(option, argv) {
+  if (!option) {
+    throw new Error(format(INVALID_ARGUMENT, option, option.shortId));
+  }
 
-function parseToken(token, argv, result, refs) {
+  if (option.type) {
+    return parseArgument(option, argv);
+  }
+
+  return true;
+}
+
+function parseOptions(args, shortIds, argv, result) {
+  for (var i = 1; i < args.length; i++) {
+    var option = shortIds[args[i]];
+    result.options[option.id] = parseOption(option, argv);
+  }
+}
+
+function parseToken(parser, token, argv, result) {
+  var option;
   if (token.indexOf('--') === 0) {
     if (token.length > 2) {
-      parseOption(refs.longIds[token.substring(2)], argv, result);
+      option = parser.optionLongIds[token.substring(2)];
+      result.options[option.id] = parseOption(option, argv);
+    } else {
+      parser.operandMode = true;
     }
   } else if (token.indexOf('-') === 0) {
-    var option = refs.shortIds[token[1]];
+    option = parser.optionShortIds[token[1]];
     if (token.length > 2) {
-      parseOptions(token, refs.shortIds, argv, result);
+      parseOptions(token, parser.optionShortIds, argv, result);
     } else {
-      parseOption(option, argv, result);
+      result.options[option.id] = parseOption(option, argv);
     }
   } else {
     result.operands.push(token);
   }
 }
 
-function parseOption(option, argv, result) {
-  if (!option) {
-    throw new Error(format(INVALID_ARGUMENT, option, option.shortId));
-  }
-
-  var arg = true;
-  if (option.type) {
-    arg = parseArg(option, arg, argv);
-  }
-  result.options[option.id] = arg;
-}
-
-function parseOptions(args, shortIds, argv, result) {
-  for (var i = 1; i < args.length; i++) {
-    var option = shortIds[args[i]];
-    parseOption(option, argv, result);
-  }
-}
-
 function ArgvParser(config) {
-  this.optionRefs = {
-    longIds: {},
-    shortIds: {},
-    values: {}
-  };
-  this.options = prepareOptions(config.options, this.optionRefs);
+  this.options = merge(DEFAULT_OPTIONS, config.options || {});
+  this.optionLongIds = {};
+  this.optionShortIds = {};
+  this.optionValues = {};
 
-  this.operandRefs = {
-    values: {}
-  };
-  this.operands = prepareOperands(config.operands, this.operandRefs);
+  prepareOptions(this, this.options);
+
+  this.operands = clone(config.operands || {});
+  this.operandValues = {};
+  this.operandMode = false;
+
+  prepareOperands(this, this.operands);
 }
 
 ArgvParser.prototype.help = function (stream) {
@@ -298,21 +287,19 @@ ArgvParser.prototype.version = function (stream) {
 ArgvParser.prototype.parse = function (argv) {
   argv = prepareArgv(argv);
 
-  var optionRefs = this.optionRefs;
-  var operandRefs = this.operandRefs;
   var result = {
-    options: clone(optionRefs.values),
-    operands: []//clone(operandRefs.values)
+    options: clone(this.optionValues),
+    operands: []//clone(this.operandValues)
   };
 
-  var arg;
-  // TODO add support for operands
-  while ((arg = argv.shift())) {
-    parseToken(arg, argv, result, optionRefs);
+  for (var arg; (arg = argv.shift());) {
+    parseToken(this, arg, argv, result);
   }
+
   if (result.help) {
     this.help();
   }
+
   if (result.version) {
     this.version();
   }
