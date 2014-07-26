@@ -1,14 +1,13 @@
 'use strict';
 
 var assert = require('assert');
-
 var ArgvParser = require('..');
 
 it('should hande short options', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -26,7 +25,7 @@ it('should hande long options', function() {
   var config = {
     options: {
       fooBar: {
-        description: 'Test --fooBar',
+        description: 'Test --fooBar'
       },
       barFoo: {
         description: 'Test --barFoo',
@@ -44,7 +43,7 @@ it('should fail when long option missing -- prefix', function() {
   var config = {
     options: {
       fooBar: {
-        description: 'Test --fooBar',
+        description: 'Test --fooBar'
       },
       barFoo: {
         description: 'Test --barFoo',
@@ -63,7 +62,7 @@ it('should fail when long option missing -- prefix', function() {
   var config = {
     options: {
       fooBar: {
-        description: 'Test --fooBar',
+        description: 'Test --fooBar'
       },
       barFoo: {
         description: 'Test --barFoo',
@@ -81,7 +80,7 @@ it('should fail when unknown option specified', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       }
     }
   };
@@ -125,7 +124,7 @@ it('should apply default when option missing', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -202,7 +201,7 @@ it('should handle condensed short options', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -220,7 +219,7 @@ it('should handle mutiple arguments', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -239,7 +238,7 @@ it('should handle mutiple comma-separated arguments', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -258,7 +257,7 @@ it('should handle mutiple separated arguments', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -277,7 +276,7 @@ it('should handle mutiple flag with single argument', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
@@ -296,11 +295,11 @@ it('should add everything after option terminator to operands', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
-        type: 'string',
+        type: 'string'
       },
     }
   };
@@ -314,11 +313,11 @@ it('should add interspersed values as operands', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
-        type: 'string',
+        type: 'string'
       },
     }
   };
@@ -333,7 +332,7 @@ it('should fail when adjacent argument specified', function() {
     options: {
       bar: {
         description: 'Test --bar',
-        type: 'string',
+        type: 'string'
       },
     }
   };
@@ -347,7 +346,7 @@ it('should fail when missing required options', function() {
   var config = {
     options: {
       foo: {
-        description: 'Test --foo',
+        description: 'Test --foo'
       },
       bar: {
         description: 'Test --bar',
