@@ -47,6 +47,8 @@ var PROPERTY_MISMATCH = 'Property mismatch between \'%s\' & \'%s\' for \'%s\'';
 
 var MISSING_ARGUMENTS = 'Missing arguments \'%s\'';
 var INVALID_ARGUMENT = 'Unknown argument \'%s\' for \'%s\'';
+var INVALID_OPTION = 'Unknown option \'%s\'';
+var INVALID_CONDENSED_OPTION = 'Unknown option \'%s\' in \'%s\'';
 var MISSING_VALUE = 'Missing \'%s\' for argument \'%s\'';
 var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
 
@@ -161,11 +163,12 @@ function prepareOperands(parser, operands) {
 function prepareArgv(argv) {
   if (!argv) {
     argv = process.argv;
-  }
-  for (var i = 0; i < argv.length; i++) {
-    if (argv[i] === module.parent.filename || (argv[i] === OPTION_TERMINATOR)) {
-      argv = argv.slice(i + 1);
-      break;
+    for (var i = 0; i < argv.length; i++) {
+      var arg = argv[i];
+      if (arg=== module.parent.filename || (arg === OPTION_TERMINATOR)) {
+        argv = argv.slice(i + 1);
+        break;
+      }
     }
   }
   return argv;
@@ -235,34 +238,55 @@ function parseOption(option, argv) {
 
 function parseOptions(args, shortIds, argv, result) {
   for (var i = 1; i < args.length; i++) {
-    var option = shortIds[args[i]];
+    var arg = args[i];
+    var option = shortIds[arg];
+    if (!option) {
+      throw new Error(format(INVALID_CONDENSED_OPTION, arg, args));
+    }
+    result.options[option.id] = parseOption(option, argv);
+  }
+}
+
+function parseLongOption(parser, token, argv, result) {
+  if (token.length > 2) {
+    var option = parser.optionLongIds[token.substring(2)];
+    if (!option) {
+      throw new Error(format(INVALID_OPTION, token[1]));
+    }
+    result.options[option.id] = parseOption(option, argv);
+  }
+}
+
+function parseShortOption(parser, token, argv, result) {
+  if (token.length > 2) {
+    parseOptions(token, parser.optionShortIds, argv, result);
+  } else {
+    var option = parser.optionShortIds[token[1]];
+    if (!option) {
+      throw new Error(format(INVALID_OPTION, token[1]));
+    }
     result.options[option.id] = parseOption(option, argv);
   }
 }
 
 function parseToken(parser, token, argv, result) {
-  var option;
-  if (token.indexOf('--') === 0) {
-    if (token.length > 2) {
-      option = parser.optionLongIds[token.substring(2)];
-      result.options[option.id] = parseOption(option, argv);
-    } else {
+  if (parser.operandMode) {
+    result.operands.push(token);
+  } else if (token.indexOf('--') === 0) {
+    if (token.length === 2) {
       parser.operandMode = true;
+    } else {
+      parseLongOption(parser, token, argv, result);
     }
   } else if (token.indexOf('-') === 0) {
-    option = parser.optionShortIds[token[1]];
-    if (token.length > 2) {
-      parseOptions(token, parser.optionShortIds, argv, result);
-    } else {
-      result.options[option.id] = parseOption(option, argv);
-    }
+    parseShortOption(parser, token, argv, result);
   } else {
     result.operands.push(token);
   }
 }
 
 function ArgvParser(config) {
-  this.options = merge(DEFAULT_OPTIONS, config.options || {});
+  this.options = merge(true, DEFAULT_OPTIONS, config.options);
   this.optionLongIds = {};
   this.optionShortIds = {};
   this.optionValues = {};
@@ -275,6 +299,8 @@ function ArgvParser(config) {
 
   prepareOperands(this, this.operands);
 }
+
+ArgvParser.DEFAULT_OPTIONS = DEFAULT_OPTIONS;
 
 ArgvParser.prototype.help = function (stream) {
   help(this, stream);
