@@ -176,8 +176,12 @@ function prepareArgv(argv) {
   return argv;
 }
 
+function invalidArgument(type, arg) {
+  return arg === undefined || (type !== 'number' && (arg.indexOf('-') === 0));
+}
+
 function parseSingleArgument(option, arg) {
-  if (arg === undefined || (arg.indexOf('-') === 0)) {
+  if (invalidArgument(option.type, arg)) {
     throw new Error(format(MISSING_VALUE, option.hint, option.shortId));
   }
   if (option.type === 'number') {

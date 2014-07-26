@@ -57,25 +57,6 @@ it('should fail when long option missing -- prefix', function() {
   });
 });
 
-
-it('should fail when long option missing -- prefix', function() {
-  var config = {
-    options: {
-      fooBar: {
-        description: 'Test --fooBar'
-      },
-      barFoo: {
-        description: 'Test --barFoo',
-        type: 'string'
-      },
-    }
-  };
-  var parser = new ArgvParser(config);
-  assert.throws(function () {
-    console.log(parser.parse('-foo-bar --bar-foo bar'.split(' ')));
-  });
-});
-
 it('should fail when unknown option specified', function() {
   var config = {
     options: {
@@ -118,6 +99,24 @@ it('should fail when invalid argument specified', function() {
   assert.throws(function () {
     parser.parse('-b boo'.split(' '));
   });
+});
+
+it('should handle signed number arguments', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo'
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'number'
+      }
+    }
+  };
+  var parser = new ArgvParser(config);
+  var result = parser.parse('-f -b -42'.split(' '));
+  assert.equal(result.options.foo, true);
+  assert.strictEqual(result.options.bar, -42);
 });
 
 it('should apply default when option missing', function() {
