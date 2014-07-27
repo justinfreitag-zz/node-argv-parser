@@ -4,6 +4,9 @@ var ArgvParser = require('..');
 
 it('should dispaly help for specified config', function() {
   var config = {
+    help: {
+      banner: 'This utility is responsible for...'
+    },
     options: {
       foo: {
         description: 'Test --foo',
@@ -31,7 +34,21 @@ it('should dispaly help for specified config', function() {
         type: 'number',
         required: true
       }
-   }
+    },
+    operands: {
+      command: {
+        hint: 'COMMAND',
+        required: true,
+        type: 'string',
+        description: 'Command to run'
+      },
+      fooFiles: {
+        hint: 'FILE',
+        multiple: true,
+        type: 'string',
+        description: 'Test operand FILE'
+      }
+    }
   };
   var parser = new ArgvParser(config);
   parser.help(process.stdout);

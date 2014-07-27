@@ -290,25 +290,51 @@ it('should handle mutiple flag with single argument', function() {
   assert.deepEqual(result.options.bar, ['bar']);
 });
 
-it('should add everything after option terminator to operands', function() {
+it('should fail on invalid operand type', function() {
   var config = {
     options: {
       foo: {
         description: 'Test --foo'
-      },
+      }
+    },
+    operands: {
       bar: {
-        description: 'Test --bar',
-        type: 'string'
-      },
+        multiple: true,
+        type: 'number'
+      }
     }
   };
   var parser = new ArgvParser(config);
-  var result = parser.parse('-f -b bar -- -foobar'.split(' '));
-  assert.equal(result.options.foo, true);
-  assert.equal(result.operands[0], '-foobar');
+  assert.throws(function () {
+    parser.parse('-f foo 42'.split(' '));
+  });
 });
 
-it('should add interspersed values as operands', function() {
+it('should handle mix of single and multiple operands', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo'
+      }
+    },
+    operands: {
+      barFoo: {
+        type: 'string'
+      },
+      bar: {
+        multiple: true,
+        type: 'number'
+      }
+    }
+  };
+  var parser = new ArgvParser(config);
+  var result = parser.parse('-f foo 4 2'.split(' '));
+  assert.equal(result.options.foo, true);
+  assert.equal(result.operands.barFoo, 'foo');
+  assert.deepEqual(result.operands.bar, [4, 2]);
+});
+
+it('should add multiple string operands', function() {
   var config = {
     options: {
       foo: {
@@ -318,12 +344,62 @@ it('should add interspersed values as operands', function() {
         description: 'Test --bar',
         type: 'string'
       },
+    },
+    operands: {
+      argv: {
+        multiple: true,
+        type: 'string'
+      }
     }
   };
   var parser = new ArgvParser(config);
-  var result = parser.parse('-f 42 -b bar barfoo -- -foobar'.split(' '));
+  var result = parser.parse('-f -b bar foobar bar foo'.split(' '));
   assert.equal(result.options.foo, true);
-  assert.deepEqual(result.operands, [42, 'barfoo', '-foobar']);
+  assert.deepEqual(result.operands.argv, ['foobar', 'bar', 'foo']);
+});
+
+it('should add arguments after terminator to operand', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo'
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'string'
+      },
+    },
+    operands: {
+      argv: {
+        multiple: true,
+        type: 'string'
+      }
+    }
+  };
+  var parser = new ArgvParser(config);
+  var result = parser.parse('-f -b bar -- -foobar bar foo'.split(' '));
+  assert.equal(result.options.foo, true);
+  assert.deepEqual(result.operands.argv, ['-foobar', 'bar', 'foo']);
+});
+
+it('should fail with unexpected operand', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+        required: true
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'string',
+        required: true
+      },
+    }
+  };
+  var parser = new ArgvParser(config);
+  assert.throws(function () {
+    parser.parse('-f 42 -b bar -foobar'.split(' '));
+  });
 });
 
 it('should fail when adjacent argument specified', function() {

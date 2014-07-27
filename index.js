@@ -49,6 +49,7 @@ var INVALID_OPTION = 'Unknown option \'%s\'';
 var INVALID_CONDENSED_OPTION = 'Unknown option \'%s\' in \'%s\'';
 var MISSING_VALUE = 'Missing \'%s\' for argument \'%s\'';
 var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
+var INVALID_OPERAND = 'Unknown operand \'%s\'';
 
 var OPTION_TERMINATOR = '--';
 
@@ -166,6 +167,7 @@ function prepareOperand(parser, id, operand) {
   operand.id = id;
   validateProperties(operand, OPERAND_PROPERTIES);
   prepareArgument(operand, parser.operandValues);
+  parser.operandStack.unshift(operand);
 }
 
 function prepareOperands(parser, operands) {
@@ -190,12 +192,13 @@ function prepareArgv(argv) {
   return argv;
 }
 
+// TODO remove need for this function
 function invalidArgument(type, arg) {
   return arg === undefined || (type !== 'number' && (arg.indexOf('-') === 0));
 }
 
-function parseSingleArgument(option, arg) {
-  if (invalidArgument(option.type, arg)) {
+function parseSingleArgument(option, arg, isOperand) {
+  if (!isOperand && invalidArgument(option.type, arg)) {
     throw new Error(format(MISSING_VALUE, option.hint, option.shortId));
   }
   if (option.type === 'number') {
@@ -209,11 +212,11 @@ function parseSingleArgument(option, arg) {
   return arg;
 }
 
-function parseMultipleArguments(option, args, argv) {
+function parseMultipleArguments(option, args, argv, isOperand) {
   var arg;
   while ((arg = argv.shift())) {
     try {
-      args.push(parseSingleArgument(option, arg));
+      args.push(parseSingleArgument(option, arg, isOperand));
     } catch (error) {
       argv.unshift(arg);
       break;
@@ -222,15 +225,22 @@ function parseMultipleArguments(option, args, argv) {
   return args;
 }
 
-function parseArgument(option, argv, result) {
-  var arg = parseSingleArgument(option, argv.shift());
+// TODO fix option-argument vs operand
+// TODO errors are argument specific as well
+function parseArgument(option, argv, result, isOperand) {
+  var arg = parseSingleArgument(option, argv.shift(), isOperand);
   if (option.multiple) {
-    arg = arg.split(',');
-    var values = result.options[option.id];
-    if (values) {
-      arg = values.concat(arg);
+    if (typeof arg === 'string') {
+      arg = arg.split(',');
     }
-    arg = parseMultipleArguments(option, arg, argv);
+    var values;
+    if (isOperand) {
+      values = result.operands[option.id] || [];
+    } else {
+      values = result.options[option.id] || [];
+    }
+    arg = values.concat(arg);
+    arg = parseMultipleArguments(option, arg, argv, isOperand);
   }
   return arg;
 }
@@ -278,9 +288,19 @@ function parseShortOption(parser, token, argv, result) {
   }
 }
 
+function parseOperand(parser, token, argv, result) {
+  var operand = parser.operandStack.pop();
+  if (!operand) {
+    throw new Error(format(INVALID_OPERAND, token));
+  }
+
+  argv.unshift(token);
+  result.operands[operand.id] = parseArgument(operand, argv, result, true);
+}
+
 function parseToken(parser, token, argv, result) {
   if (parser.operandMode) {
-    result.operands.push(token);
+    parseOperand(parser, token, argv, result);
   } else if (token.indexOf('--') === 0) {
     if (token.length === 2) {
       parser.operandMode = true;
@@ -290,7 +310,8 @@ function parseToken(parser, token, argv, result) {
   } else if (token.indexOf('-') === 0) {
     parseShortOption(parser, token, argv, result);
   } else {
-    result.operands.push(token);
+    parser.operandMode = true;
+    parseOperand(parser, token, argv, result);
   }
 }
 
@@ -319,6 +340,7 @@ function ArgvParser(config) {
 
   this.operands = this.config.operands;
   this.operandMode = false;
+  this.operandStack = [];
   this.operandValues = {};
 
   prepareOperands(this, this.operands);
@@ -339,10 +361,11 @@ ArgvParser.prototype.parse = function (argv) {
 
   var result = {
     options: clone(this.optionValues),
-    operands: []//clone(this.operandValues)
+    operands: clone(this.operandValues)
   };
 
-  for (var arg; (arg = argv.shift());) {
+  var arg;
+  while((arg = argv.shift())) {
     parseToken(this, arg, argv, result);
   }
 
