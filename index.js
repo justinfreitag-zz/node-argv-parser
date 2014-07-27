@@ -163,14 +163,16 @@ function prepareOperands(parser, operands) {
 }
 
 function prepareArgv(argv) {
-  if (!argv) {
-    argv = process.argv;
-    for (var i = 0; i < argv.length; i++) {
-      var arg = argv[i];
-      if (arg=== module.parent.filename || (arg === OPTION_TERMINATOR)) {
-        argv = argv.slice(i + 1);
-        break;
-      }
+  if (argv) {
+    return argv;
+  }
+
+  argv = process.argv;
+  for (var i = 0; i < argv.length; i++) {
+    var arg = argv[i];
+    if (arg=== module.parent.filename || (arg === OPTION_TERMINATOR)) {
+      argv = argv.slice(i + 1);
+      break;
     }
   }
   return argv;
@@ -294,6 +296,8 @@ function checkResult(parser, result) {
 }
 
 function ArgvParser(config) {
+  this.config = config;
+
   this.options = merge(true, DEFAULT_OPTIONS, config.options);
   this.optionLongIds = {};
   this.optionShortIds = {};
