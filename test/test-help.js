@@ -1,6 +1,5 @@
 'use strict';
 
-//var assert = require('assert');
 var ArgvParser = require('..');
 
 it('should dispaly help for specified config', function() {
@@ -16,6 +15,10 @@ it('should dispaly help for specified config', function() {
         type: 'string',
         required: true
       },
+      other: {
+        description: 'Test --fooBar',
+        required: true
+      },
       fooBar: {
         description: 'Test --fooBar',
         multiple: true,
@@ -28,7 +31,7 @@ it('should dispaly help for specified config', function() {
         type: 'number',
         required: true
       }
-    }
+   }
   };
   var parser = new ArgvParser(config);
   parser.help(process.stdout);
