@@ -2,7 +2,7 @@
 
 var clone = require('node-v8-clone').clone;
 var help = require('./lib/help');
-var merge = require('merge');
+var merge = require('deepmerge');
 var paramCase = require('param-case');
 var format = require('util').format;
 
@@ -52,12 +52,24 @@ var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
 
 var OPTION_TERMINATOR = '--';
 
-var DEFAULT_OPTIONS = {
+var DEFAULT_CONFIG = {
   help: {
-    description: 'This help text'
+    name: process.argv[0],
+    noColor: false,
+    usage: {
+      requiredThreshold: 5,
+      optionalThreshold: 4
+    }
   },
-  version: {
-    description: 'Show utility version information'
+  options: {
+    help: {
+      description: 'This help text'
+    },
+    version: {
+      description: 'Show version info'
+    }
+  },
+  operands: {
   }
 };
 
@@ -296,26 +308,26 @@ function checkResult(parser, result) {
 }
 
 function ArgvParser(config) {
-  this.config = config;
+  this.config = merge(DEFAULT_CONFIG, config);
 
-  this.options = merge(true, DEFAULT_OPTIONS, config.options);
+  this.options = this.config.options;
   this.optionLongIds = {};
   this.optionShortIds = {};
   this.optionValues = {};
 
   prepareOptions(this, this.options);
 
-  this.operands = clone(config.operands || {});
-  this.operandValues = {};
+  this.operands = this.config.operands;
   this.operandMode = false;
+  this.operandValues = {};
 
   prepareOperands(this, this.operands);
 }
 
-ArgvParser.DEFAULT_OPTIONS = DEFAULT_OPTIONS;
+ArgvParser.DEFAULT_CONFIG = DEFAULT_CONFIG;
 
 ArgvParser.prototype.help = function (stream) {
-  help(this, stream);
+  help(this.config.help, this.options, this.operands, stream);
 };
 
 ArgvParser.prototype.version = function (stream) {
