@@ -210,13 +210,78 @@ it('should fail on unknown option property', function() {
   });
 });
 
-// TODO add suport for array values, implies many=true
+it('should handle option argument with implied type', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+        default: 42
+      }
+    }
+  };
+  var result = parser.parse('-f 43'.split(' '), config);
+  assert.equal(result.foo, 43);
+});
+
+it('should handle condensed option array type', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+        many: true
+      }
+    }
+  };
+  var result = parser.parse(['-fff'], config);
+  assert.equal(result.foo, 3);
+});
+
+it('should handle separated option array type', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+        many: true
+      }
+    }
+  };
+  var result = parser.parse('-f -f -f'.split(' '), config);
+  assert.equal(result.foo, 3);
+});
+
+it('should handle option argument with implied array type', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+        default: ['foo']
+      }
+    }
+  };
+  var result = parser.parse('-f bar 42'.split(' '), config);
+  assert.deepEqual(result.foo, ['bar', '42']);
+});
+
+it('should fail on empty default array', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo',
+        default: []
+      }
+    }
+  };
+  assert.throws(function () {
+    parser.parse([], config);
+  });
+});
+
 it('should fail on unknown default value type', function() {
   var config = {
     options: {
       foo: {
         description: 'Test --foo',
-        default: ['foo', 42]
+        default: {foo: 42}
       }
     }
   };
@@ -504,6 +569,31 @@ it('should fail with unexpected operand', function() {
   assert.throws(function () {
     parser.parse('foo bar'.split(' '), config);
   });
+});
+
+it('should handle operand with default type', function() {
+  var config = {
+    operands: {
+      foo: {
+        description: 'Test --foo'
+      }
+    }
+  };
+  var result = parser.parse(['foo'], config);
+  assert.deepEqual(result.foo, 'foo');
+});
+
+it('should handle operand with implied type', function() {
+  var config = {
+    operands: {
+      foo: {
+        description: 'Test --foo',
+        default: 42
+      }
+    }
+  };
+  var result = parser.parse(['43'], config);
+  assert.deepEqual(result.foo, 43);
 });
 
 it('should handle comma separated operands', function() {

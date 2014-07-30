@@ -26,7 +26,7 @@ it('should dispaly help for specified config', function() {
         description: 'Test --fooBar',
         many: true,
         type: 'number',
-        default: 42
+        default: [42]
       },
       barFoo: {
         description: 'Test --barFoo',

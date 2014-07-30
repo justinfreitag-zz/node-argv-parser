@@ -34,6 +34,7 @@ var OPERAND_PROPERTIES = [
 
 var ID_CONFLICT = 'ID conflict between between \'%s\' and \'%s\'';
 var INVALID_TYPE = 'Invalid type \'%s\' for \'%s\'';
+var INVALID_DEFAULT = 'Invalid default for \'%s\'';
 var INVALID_PROPERTY = 'Unknown property \'%s\' for \'%s\'';
 var PROPERTY_MISMATCH = 'Property mismatch between \'%s\' & \'%s\' for \'%s\'';
 var INVALID_ARGUMENT = 'Unknown argument \'%s\'';
@@ -82,29 +83,53 @@ function createLongId(id) {
   return paramCase(id);
 }
 
-function prepareType(meta) {
-  if (!meta.type && (meta.default !== undefined)) {
-    meta.type = typeof meta.default;
-  }
+function prepareArrayType(meta) {
+  if (meta.default !== undefined) {
+    if (!(meta.default instanceof Array) || !meta.default.length) {
+      throw new Error(format(INVALID_DEFAULT, meta.id));
+    }
 
-  if (meta.type && !meta.name) {
-    meta.name = meta.type.toUpperCase();
+    if (meta.type && (typeof meta.default[0] !== meta.type)) {
+      throw new Error(format(PROPERTY_MISMATCH, 'default', 'type', meta.id));
+    }
+
+    if (!meta.type) {
+      meta.type = typeof meta.default[0];
+    }
+  }
+}
+
+function prepareType(meta) {
+  if (!meta.type && meta.default !== undefined) {
+    meta.type = typeof meta.default;
   }
 
   if (meta.type && (ARGUMENT_TYPES.indexOf(meta.type) === -1)) {
     throw new Error(format(INVALID_TYPE, meta.type, meta.id));
   }
-}
-
-function prepareArgument(meta) {
-  prepareType(meta);
-
-  if (meta.required && (meta.default !== undefined))  {
-    throw new Error(format(PROPERTY_MISMATCH, 'required', 'default', meta.id));
-  }
 
   if (meta.default !== undefined && (typeof meta.default !== meta.type)) {
     throw new Error(format(PROPERTY_MISMATCH, 'default', 'type', meta.id));
+  }
+}
+
+function prepareArgument(meta) {
+  if (meta.default instanceof Array) {
+    meta.many = true;
+  }
+
+  if (meta.many) {
+    prepareArrayType(meta);
+  } else {
+    prepareType(meta);
+  }
+
+  if (!meta.name && meta.type) {
+    meta.name = meta.type.toUpperCase();
+  }
+
+  if (meta.required && (meta.default !== undefined))  {
+    throw new Error(format(PROPERTY_MISMATCH, 'required', 'default', meta.id));
   }
 }
 
@@ -256,7 +281,7 @@ function addResult(meta, result, results) {
     return;
   }
 
-  results[meta.id] += result;
+  results[meta.id] = existingResult + 1;
 }
 
 function handleArg(meta, arg, args, results) {
