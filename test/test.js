@@ -1,7 +1,7 @@
 'use strict';
 
 var assert = require('assert');
-var ArgvParser = require('..');
+var parser = require('..');
 
 it('should hande short options', function() {
   var config = {
@@ -15,8 +15,7 @@ it('should hande short options', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-f -b bar'.split(' '));
+  var result = parser.parse('-f -b bar'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.equal(result.options.bar, 'bar');
 });
@@ -33,8 +32,7 @@ it('should hande long options', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('--foo-bar --bar-foo bar'.split(' '));
+  var result = parser.parse('--foo-bar --bar-foo bar'.split(' '), config);
   assert.equal(result.options.fooBar, true);
   assert.equal(result.options.barFoo, 'bar');
 });
@@ -51,9 +49,8 @@ it('should fail when long option missing -- prefix', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
-    console.log(parser.parse('-foo-bar --bar-foo bar'.split(' ')));
+    console.log(parser.parse('-foo-bar --bar-foo bar'.split(' '), config));
   });
 });
 
@@ -65,9 +62,8 @@ it('should fail when unknown option specified', function() {
       }
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
-    parser.parse('-f -F'.split(' '));
+    parser.parse('-f -F'.split(' '), config);
   });
 });
 
@@ -80,9 +76,8 @@ it('should fail when missing argument', function() {
       }
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
-    parser.parse('-f'.split(' '));
+    parser.parse('-f'.split(' '), config);
   });
 });
 
@@ -95,9 +90,8 @@ it('should fail when invalid argument specified', function() {
       }
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
-    parser.parse('-b boo'.split(' '));
+    parser.parse('-b boo'.split(' '), config);
   });
 });
 
@@ -113,8 +107,7 @@ it('should handle signed number arguments', function() {
       }
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-f -b -42'.split(' '));
+  var result = parser.parse('-f -b -42'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.strictEqual(result.options.bar, -42);
 });
@@ -128,12 +121,11 @@ it('should apply default when option missing', function() {
       bar: {
         description: 'Test --bar',
         type: 'number',
-        value: 42
+        default: 42
       }
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-f'.split(' '));
+  var result = parser.parse('-f'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.strictEqual(result.options.bar, 42);
 });
@@ -143,13 +135,12 @@ it('should fail on default/type mismatch', function() {
     options: {
       bar: {
         description: 'Test --bar',
-        value: 42
+        default: 42
       }
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
-    parser.parse('-b bar'.split(' '));
+    parser.parse('-b bar'.split(' '), config);
   });
 });
 
@@ -158,13 +149,13 @@ it('should fail on required and default property mismatch', function() {
     options: {
       bar: {
         description: 'Test --bar',
-        value: 'bar',
+        default: 'bar',
         required: true
       }
     }
   };
   assert.throws(function () {
-    new ArgvParser(config);
+    parser.parse('', config);
   });
 });
 
@@ -177,22 +168,22 @@ it('should fail on unknown property', function() {
     }
   };
   assert.throws(function () {
-    new ArgvParser(config);
+    parser.parse('', config);
   });
 });
 
-// TODO add suport for array values, implies multiple=true
+// TODO add suport for array values, implies many=true
 it('should fail on unknown default value type', function() {
   var config = {
     options: {
       bar: {
         description: 'Test --bar',
-        value: ['foo', 'bar']
+        default: ['foo', 'bar']
       }
     }
   };
   assert.throws(function () {
-    new ArgvParser(config);
+    parser.parse('', config);
   });
 });
 
@@ -208,8 +199,7 @@ it('should handle condensed short options', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-fb bar'.split(' '));
+  var result = parser.parse('-fb bar'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.equal(result.options.bar, 'bar');
 });
@@ -223,12 +213,11 @@ it('should handle mutiple arguments', function() {
       bar: {
         description: 'Test --bar',
         type: 'string',
-        multiple: true
+        many: true
       }
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-b bar foo -f'.split(' '));
+  var result = parser.parse('-b bar foo -f'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.deepEqual(result.options.bar, ['bar', 'foo']);
 });
@@ -242,12 +231,11 @@ it('should handle mutiple comma-separated arguments', function() {
       bar: {
         description: 'Test --bar',
         type: 'string',
-        multiple: true
+        many: true
       }
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-b bar,foo -f'.split(' '));
+  var result = parser.parse('-b bar,foo -f'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.deepEqual(result.options.bar, ['bar', 'foo']);
 });
@@ -261,12 +249,11 @@ it('should handle mutiple separated arguments', function() {
       bar: {
         description: 'Test --bar',
         type: 'string',
-        multiple: true
+        many: true
       }
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-b bar -f -b foo'.split(' '));
+  var result = parser.parse('-b bar -f -b foo'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.deepEqual(result.options.bar, ['bar', 'foo']);
 });
@@ -280,12 +267,11 @@ it('should handle mutiple flag with single argument', function() {
       bar: {
         description: 'Test --bar',
         type: 'string',
-        multiple: true
+        many: true
       }
     }
   };
-  var parser = new ArgvParser(config);
-  var result = parser.parse('-b bar -f'.split(' '));
+  var result = parser.parse('-b bar -f'.split(' '), config);
   assert.equal(result.options.foo, true);
   assert.deepEqual(result.options.bar, ['bar']);
 });
@@ -299,18 +285,17 @@ it('should fail on invalid operand type', function() {
     },
     operands: {
       bar: {
-        multiple: true,
+        many: true,
         type: 'number'
       }
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
     parser.parse('-f foo 42'.split(' '));
   });
 });
 
-it('should handle mix of single and multiple operands', function() {
+it('should handle mix of single and many operands', function() {
   var config = {
     options: {
       foo: {
@@ -322,19 +307,18 @@ it('should handle mix of single and multiple operands', function() {
         type: 'string'
       },
       bar: {
-        multiple: true,
+        many: true,
         type: 'number'
       }
     }
   };
-  var parser = new ArgvParser(config);
   var result = parser.parse('-f foo 4 2'.split(' '));
   assert.equal(result.options.foo, true);
   assert.equal(result.operands.barFoo, 'foo');
   assert.deepEqual(result.operands.bar, [4, 2]);
 });
 
-it('should add multiple string operands', function() {
+it('should add many string operands', function() {
   var config = {
     options: {
       foo: {
@@ -347,12 +331,11 @@ it('should add multiple string operands', function() {
     },
     operands: {
       argv: {
-        multiple: true,
+        many: true,
         type: 'string'
       }
     }
   };
-  var parser = new ArgvParser(config);
   var result = parser.parse('-f -b bar foobar bar foo'.split(' '));
   assert.equal(result.options.foo, true);
   assert.deepEqual(result.operands.argv, ['foobar', 'bar', 'foo']);
@@ -371,12 +354,11 @@ it('should add arguments after terminator to operand', function() {
     },
     operands: {
       argv: {
-        multiple: true,
+        many: true,
         type: 'string'
       }
     }
   };
-  var parser = new ArgvParser(config);
   var result = parser.parse('-f -b bar -- -foobar bar foo'.split(' '));
   assert.equal(result.options.foo, true);
   assert.deepEqual(result.operands.argv, ['-foobar', 'bar', 'foo']);
@@ -396,7 +378,6 @@ it('should fail with unexpected operand', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
     parser.parse('-f 42 -b bar -foobar'.split(' '));
   });
@@ -411,7 +392,6 @@ it('should fail when adjacent argument specified', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
     parser.parse('-bfoo'.split(' '));
   });
@@ -430,7 +410,6 @@ it('should fail when missing required options', function() {
       },
     }
   };
-  var parser = new ArgvParser(config);
   assert.throws(function () {
     parser.parse('--foo'.split(' '));
   });

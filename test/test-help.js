@@ -14,7 +14,7 @@ it('should dispaly help for specified config', function() {
       },
       bar: {
         description: 'Test --bar',
-        hint: 'BAR',
+        name: 'BAR',
         type: 'string',
         required: true
       },
@@ -24,33 +24,33 @@ it('should dispaly help for specified config', function() {
       },
       fooBar: {
         description: 'Test --fooBar',
-        multiple: true,
+        many: true,
         type: 'number',
-        value: 42
+        default: 42
       },
       barFoo: {
         description: 'Test --barFoo',
-        multiple: true,
+        many: true,
         type: 'number',
         required: true
       }
     },
     operands: {
       command: {
-        hint: 'COMMAND',
+        name: 'COMMAND',
         required: true,
         type: 'string',
         description: 'Command to run'
       },
       fooFiles: {
-        hint: 'FILE',
-        multiple: true,
+        name: 'FILE',
+        many: true,
         type: 'string',
         description: 'Test operand FILE'
       }
     }
   };
-  var parser = new ArgvParser(config);
-  parser.help(process.stdout);
+
+  ArgvParser.help(config);
 });
 

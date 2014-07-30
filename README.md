@@ -10,5 +10,5 @@ adheres to the [UNIX Utility Conventions][utility-conventions].
 [depstat-url]: https://david-dm.org/justinfreitag/node-argv-parser
 [depstat-image]: https://david-dm.org/justinfreitag/node-argv-parser.png
 [nodejs]: http://nodejs.org
-[utlity-conventions]: http://pubs.opengroup.org/onlinepubs/7908799/xbd/utilconv.html
+[utility-conventions]: http://pubs.opengroup.org/onlinepubs/7908799/xbd/utilconv.html
 
