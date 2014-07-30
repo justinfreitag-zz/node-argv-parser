@@ -207,16 +207,16 @@ function expandShortOption(arg, args, optionCache) {
 
   for (var i = 1; i < arg.length; i++) {
     var option = optionCache[arg[i]];
-
     if (!option) {
-      throw new Error(format(INVALID_OPTION(arg)));
+      throw new Error(format(INVALID_OPTION, arg[i]));
     }
 
     tokens.push('-' + arg[i]);
 
-    if (option.type) {
+    if (option.type && ((i + 1) < arg.length)) {
       i += arg[i + 1] === '=';
-      tokens.push(arg.substring(arg[i + 1]));
+      tokens.push(arg.substring(i + 1));
+      break;
     }
   }
 
@@ -237,7 +237,7 @@ function expandOption(arg, args, optionCache) {
 
 function setResult(meta, result, results) {
   if (results[meta.id]) {
-    throw new Error(format(INVALID_VALUE, meta.id));
+    throw new Error(format(INVALID_VALUE, meta.type, meta.id));
   }
 
   results[meta.id] = result;
@@ -283,6 +283,10 @@ function handleOption(arg, args, optionCache, results)  {
   var option = optionCache[expandOption(arg, args, optionCache)];
 
   if (option.type) {
+    if (!args.length) {
+      throw new Error(format(MISSING_ARGUMENT, option.type, option.id));
+    }
+
     return option;
   }
 
@@ -290,7 +294,7 @@ function handleOption(arg, args, optionCache, results)  {
 }
 
 function parse(args, optionCache, operandStack) {
-  /* jshint maxcomplexity: 7, maxstatements: 19 */
+  /* jshint maxcomplexity: 7, maxstatements: 22 */
 
   var results = {};
   var arg;
@@ -300,10 +304,11 @@ function parse(args, optionCache, operandStack) {
     var operand;
 
     if (operand) {
-      handleArg(operand, arg, args, results);
       if (!operand.many) {
         operand = operandStack.pop();
       }
+
+      handleArg(operand, arg, args, results);
       continue;
     }
 
@@ -313,12 +318,17 @@ function parse(args, optionCache, operandStack) {
       continue;
     }
 
+    if (option) {
+      handleArg(option, arg, args, results);
+      continue;
+    }
+
     if (isOption(arg)) {
       option = handleOption(arg, args, optionCache, results);
       continue;
     }
 
-    handleArg(option || (operand = operandStack.pop()), arg, args, results);
+    handleArg((operand = operandStack.pop()), arg, args, results);
   }
 
   return results;
