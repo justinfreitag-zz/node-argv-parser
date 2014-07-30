@@ -39,7 +39,6 @@ var PROPERTY_MISMATCH = 'Property mismatch between \'%s\' & \'%s\' for \'%s\'';
 var INVALID_ARGUMENT = 'Unknown argument \'%s\'';
 var MISSING_ARGUMENT = 'Missing argument \'%s\'';
 var INVALID_OPTION = 'Unknown option \'%s\'';
-var INVALID_OPERAND = 'Unknown operand \'%s\'';
 var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
 
 var OPTION_TERMINATOR = '--';
@@ -173,7 +172,7 @@ function validateResult(meta, arg) {
   return true;
 }
 
-function tokeniseArg(arg, args) {
+function expandArg(arg, args) {
   if (isEscaped(arg)) {
     return arg.substring(1, arg.length - 1);
   }
@@ -186,7 +185,7 @@ function tokeniseArg(arg, args) {
   return args.pop();
 }
 
-function tokeniseLongOption(arg, args, optionCache) {
+function expandLongOption(arg, args, optionCache) {
   var i = arg.indexOf('=');
 
   if (i !== -1) {
@@ -203,7 +202,7 @@ function tokeniseLongOption(arg, args, optionCache) {
   return option.shortId;
 }
 
-function tokeniseShortOption(arg, args, optionCache) {
+function expandShortOption(arg, args, optionCache) {
   var tokens = [];
 
   for (var i = 1; i < arg.length; i++) {
@@ -228,12 +227,12 @@ function tokeniseShortOption(arg, args, optionCache) {
   return args.pop()[1];
 }
 
-function tokeniseOption(arg, args, optionCache) {
+function expandOption(arg, args, optionCache) {
   if (isLongOption(arg)) {
-    return tokeniseLongOption(arg, args, optionCache);
+    return expandLongOption(arg, args, optionCache);
   }
 
-  return tokeniseShortOption(arg, args, optionCache);
+  return expandShortOption(arg, args, optionCache);
 }
 
 function setResult(meta, result, results) {
@@ -265,7 +264,7 @@ function handleArg(meta, arg, args, results) {
     throw new Error(format(INVALID_ARGUMENT, arg));
   }
 
-  var result = parseArg(meta, tokeniseArg(arg, args));
+  var result = parseArg(meta, expandArg(arg, args));
 
   validateResult(meta, result);
 
@@ -281,7 +280,7 @@ function handleResult(meta, result, results) {
 }
 
 function handleOption(arg, args, optionCache, results)  {
-  var option = optionCache[tokeniseOption(arg, args, optionCache)];
+  var option = optionCache[expandOption(arg, args, optionCache)];
 
   if (option.type) {
     return option;
@@ -290,20 +289,8 @@ function handleOption(arg, args, optionCache, results)  {
   handleResult(option, true, results);
 }
 
-function handleOperand(operand, arg, args, results) {
-  if (!operand) {
-    throw new Error(format(INVALID_OPERAND(arg)));
-  }
-
-  handleArg(operand, arg, args, results);
-
-  if (operand.many) {
-    return operand;
-  }
-}
-
 function parse(args, optionCache, operandStack) {
-  /* jshint maxstatements: 16 */
+  /* jshint maxcomplexity: 7, maxstatements: 19 */
 
   var results = {};
   var arg;
@@ -313,16 +300,15 @@ function parse(args, optionCache, operandStack) {
     var operand;
 
     if (operand) {
-      // TODO smells
-      operand = handleOperand(operand, arg, args, results);
-      if (!operand) {
+      handleArg(operand, arg, args, results);
+      if (!operand.many) {
         operand = operandStack.pop();
       }
       continue;
     }
 
     if (arg === OPTION_TERMINATOR) {
-      // TODO smells
+      option = null;
       operand = operandStack.pop();
       continue;
     }
@@ -332,12 +318,7 @@ function parse(args, optionCache, operandStack) {
       continue;
     }
 
-    if (option) {
-      handleArg(option, arg, args, results);
-    } else {
-      // TODO smells
-      operand = handleOperand(operandStack.pop(), arg, args, results);
-    }
+    handleArg(option || (operand = operandStack.pop()), arg, args, results);
   }
 
   return results;
@@ -352,6 +333,7 @@ function createOptionCache(options) {
     prepareOption(option, id, optionCache);
 
     var existing = optionCache[option.shortId] || optionCache[option.longId];
+
     if (existing) {
       throw new Error(format(ID_CONFLICT, existing.id, option.id));
     }
@@ -394,12 +376,19 @@ function validateResults(results, config) {
   });
 }
 
-exports.help = function (config) {
-  exports.parse(['-h'], config);
-};
+function mergeConfig(config) {
+  if (config && config.operands) {
+    config = merge(DEFAULT_CONFIG, config);
+    delete config.operands.argv;
+  } else {
+    config = merge(DEFAULT_CONFIG, config || {});
+  }
+
+  return config;
+}
 
 exports.parse = function (argv, config) {
-  config = merge(DEFAULT_CONFIG, config || {});
+  config = mergeConfig(config);
 
   var args = (argv || process.argv).slice().reverse();
   var optionCache = createOptionCache(config.options);
@@ -408,12 +397,12 @@ exports.parse = function (argv, config) {
   var results = parse(args, optionCache, operandStack);
 
   if (results.help) {
-    help(config.help, config.options, config.operands, process.stdout);
+    console.log(help(config.help, config.options, config.operands));
     return;
   }
 
   if (results.version) {
-    process.stdout.write(config.version + '\n');
+    console.log(config.version);
     return;
   }
 

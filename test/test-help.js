@@ -1,6 +1,6 @@
 'use strict';
 
-var ArgvParser = require('..');
+var parser = require('..');
 
 it('should dispaly help for specified config', function() {
   var config = {
@@ -51,6 +51,6 @@ it('should dispaly help for specified config', function() {
     }
   };
 
-  ArgvParser.help(config);
+  parser.parse(['-h'], config);
 });
 
