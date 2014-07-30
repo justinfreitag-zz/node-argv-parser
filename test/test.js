@@ -292,6 +292,23 @@ it('should handle condensed short options separate argument', function() {
   assert.equal(result.bar, 42);
 });
 
+it('should handle assignment inside condensed short options', function() {
+  var config = {
+    options: {
+      foo: {
+        description: 'Test --foo'
+      },
+      bar: {
+        description: 'Test --bar',
+        type: 'string'
+      },
+    }
+  };
+  var result = parser.parse(['-fb4=2'], config);
+  assert.equal(result.foo, true);
+  assert.equal(result.bar, '4=2');
+});
+
 it('should fail when condensed short options missing argument', function() {
   var config = {
     options: {
