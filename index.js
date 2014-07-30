@@ -36,10 +36,11 @@ var ID_CONFLICT = 'ID conflict between between \'%s\' and \'%s\'';
 var INVALID_TYPE = 'Invalid type \'%s\' for \'%s\'';
 var INVALID_PROPERTY = 'Unknown property \'%s\' for \'%s\'';
 var PROPERTY_MISMATCH = 'Property mismatch between \'%s\' & \'%s\' for \'%s\'';
+var INVALID_ARGUMENT = 'Unknown argument \'%s\'';
 var MISSING_ARGUMENT = 'Missing argument \'%s\'';
 var INVALID_OPTION = 'Unknown option \'%s\'';
-var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
 var INVALID_OPERAND = 'Unknown operand \'%s\'';
+var INVALID_VALUE = 'Expecting \'%s\' for argument \'%s\'';
 
 var OPTION_TERMINATOR = '--';
 
@@ -61,6 +62,10 @@ var DEFAULT_CONFIG = {
     }
   },
   operands: {
+    argv: {
+      many: true,
+      type: 'string'
+    }
   }
 };
 
@@ -79,9 +84,7 @@ function createLongId(id) {
 }
 
 function prepareType(meta) {
-  /* jshint eqnull: true */
-
-  if (meta.type == null && (meta.default != null)) {
+  if (!meta.type && (meta.default !== undefined)) {
     meta.type = typeof meta.default;
   }
 
@@ -97,13 +100,11 @@ function prepareType(meta) {
 function prepareArgument(meta) {
   prepareType(meta);
 
-  /* jshint eqnull: true */
-
-  if (meta.required && (meta.default != null))  {
+  if (meta.required && (meta.default !== undefined))  {
     throw new Error(format(PROPERTY_MISMATCH, 'required', 'default', meta.id));
   }
 
-  if (meta.default != null && (typeof meta.default !== meta.type)) {
+  if (meta.default !== undefined && (typeof meta.default !== meta.type)) {
     throw new Error(format(PROPERTY_MISMATCH, 'default', 'type', meta.id));
   }
 }
@@ -119,13 +120,11 @@ function validateProperties(meta, properties) {
 function prepareOption(option, id, optionCache) {
   prepareMeta(option, id, OPTION_PROPERTIES);
 
-  /* jshint eqnull: true */
-
-  if (option.shortId == null) {
+  if (option.shortId === undefined) {
     option.shortId = createShortId(option.id, optionCache);
   }
 
-  if (option.longId == null) {
+  if (option.longId === undefined) {
     option.longId = createLongId(option.id);
   }
 }
@@ -262,6 +261,10 @@ function addResult(meta, result, results) {
 }
 
 function handleArg(meta, arg, args, results) {
+  if (!meta) {
+    throw new Error(format(INVALID_ARGUMENT, arg));
+  }
+
   var result = parseArg(meta, tokeniseArg(arg, args));
 
   validateResult(meta, result);
@@ -287,18 +290,16 @@ function handleOption(arg, args, optionCache, results)  {
   handleResult(option, true, results);
 }
 
-function handleOperand(operand, arg, operandStack, results) {
+function handleOperand(operand, arg, args, results) {
   if (!operand) {
-    throw new Error(INVALID_OPERAND(format(arg)));
+    throw new Error(format(INVALID_OPERAND(arg)));
   }
 
-  handleArg(operand, arg, results);
+  handleArg(operand, arg, args, results);
 
   if (operand.many) {
     return operand;
   }
-
-  return operandStack.pop();
 }
 
 function parse(args, optionCache, operandStack) {
@@ -312,11 +313,16 @@ function parse(args, optionCache, operandStack) {
     var operand;
 
     if (operand) {
-      operand = handleOperand(operand, arg, operandStack, results);
+      // TODO smells
+      operand = handleOperand(operand, arg, args, results);
+      if (!operand) {
+        operand = operandStack.pop();
+      }
       continue;
     }
 
     if (arg === OPTION_TERMINATOR) {
+      // TODO smells
       operand = operandStack.pop();
       continue;
     }
@@ -326,7 +332,12 @@ function parse(args, optionCache, operandStack) {
       continue;
     }
 
-    handleArg(option, arg, results);
+    if (option) {
+      handleArg(option, arg, args, results);
+    } else {
+      // TODO smells
+      operand = handleOperand(operandStack.pop(), arg, args, results);
+    }
   }
 
   return results;
@@ -353,7 +364,11 @@ function createOptionCache(options) {
 
 function createOperandStack(operands) {
   return Object.keys(operands).reverse().map(function (id) {
-    return prepareMeta(operands[id], id, OPERAND_PROPERTIES);
+    var operand = operands[id];
+
+    prepareMeta(operand, id, OPERAND_PROPERTIES);
+
+    return operand;
   });
 }
 
@@ -361,7 +376,7 @@ function applyDefaults(results, metas) {
   Object.keys(metas).forEach(function (id) {
     var meta = metas[id];
 
-    if (meta.default && results[id] === undefined) {
+    if (meta.default !== undefined && (results[id] === undefined)) {
       results[id] = meta.default;
     }
   });
@@ -371,6 +386,7 @@ function validateResults(results, config) {
   [config.options, config.operands].forEach(function (metas) {
     Object.keys(metas).forEach(function (id) {
       var meta = metas[id];
+
       if (meta.required && (results[id] === undefined)) {
         throw new Error(format(MISSING_ARGUMENT, meta.longId || meta.name));
       }
@@ -383,7 +399,7 @@ exports.help = function (config) {
 };
 
 exports.parse = function (argv, config) {
-  config = merge(DEFAULT_CONFIG, config);
+  config = merge(DEFAULT_CONFIG, config || {});
 
   var args = (argv || process.argv).slice().reverse();
   var optionCache = createOptionCache(config.options);
