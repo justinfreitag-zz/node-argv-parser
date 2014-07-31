@@ -1,9 +1,9 @@
 'use strict';
 
+var format = require('util').format;
 var help = require('./lib/help');
 var merge = require('deepmerge');
 var paramCase = require('param-case');
-var format = require('util').format;
 
 var META_PROPERTIES = [
   'description',
@@ -46,7 +46,6 @@ var OPTION_TERMINATOR = '--';
 var DEFAULT_CONFIG = {
   help: {
     name: process.argv[0],
-    noColor: false,
     usage: {
       requiredThreshold: 5,
       optionalThreshold: 4
@@ -174,7 +173,7 @@ function isEscaped(arg) {
 
 function parseArg(meta, arg) {
   if (meta.parse) {
-    return meta.parse(meta, arg);
+    return meta.parse(arg);
   }
 
   if (meta.type === 'number') {
@@ -186,14 +185,6 @@ function parseArg(meta, arg) {
   }
 
   return arg;
-}
-
-function validateResult(meta, arg) {
-  if (meta.validate) {
-    return meta.validate(arg);
-  }
-
-  return true;
 }
 
 function expandArg(arg, args) {
@@ -290,7 +281,9 @@ function handleArg(meta, arg, args, results) {
 
   var result = parseArg(meta, expandArg(arg, args));
 
-  validateResult(meta, result);
+  if (meta.validate) {
+    meta.validate(result);
+  }
 
   handleResult(meta, result, results);
 }
@@ -429,25 +422,29 @@ module.exports = function (argv, config) {
   config = mergeConfig(config);
 
   var args = (argv || process.argv).slice().reverse();
-  var optionCache = createOptionCache(config.options);
-  var operandStack = createOperandStack(config.operands);
 
-  var results = parse(args, optionCache, operandStack);
+  var results;
+  try {
+    var optionCache = createOptionCache(config.options);
+    var operandStack = createOperandStack(config.operands);
 
-  if (results.help) {
-    console.log(help(config.help, config.options, config.operands));
-    return;
+    results = parse(args, optionCache, operandStack);
+
+    if (results.help) {
+      return {
+        help: help(config.help, config.options, config.operands)
+      };
+    }
+
+    applyDefaults(results, config.options);
+    applyDefaults(results, config.operands);
+
+    validateResults(results, config);
+  } catch (error) {
+    error.help = help(config.help, config.options, config.operands);
+
+    throw error;
   }
-
-  if (results.version) {
-    console.log(config.version);
-    return;
-  }
-
-  applyDefaults(results, config.options);
-  applyDefaults(results, config.operands);
-
-  validateResults(results, config);
 
   return results;
 };

@@ -14,31 +14,38 @@ var parse = require('node-argv-parser');
 
 var config = {
   help: {
-    banner: 'remove files or directories'
+    banner: 'make links between files'
   },
   options: {
-    noPreserveRoot: {
-      description: 'do not treat "/" specially'
+    backup: {
+      default: 'none'
+      name: 'CONTROL',
+      description: 'make a backup of each existing destination file',
     },
-    recursive: {
+    symbolic: {
+      description: 'make symbolic links instead of hard links'
+    },
+    targetDirectory: {
+      require: true,
+      name: 'DIRECTORY',
       description: 'remove directories and their contents recursively'
-    },
-    force: {
-      description: 'ignore nonexistent files and arguments, never prompt'
     }
   },
   operands: {
-    files: {
-      name: 'FILE',
+    targets: {
       many: true,
-      required: true
+      required: true,
+      name: 'TARGET'
     }
   }
 };
 
 var args;
+
 try {
+
   args = parse(argv, config);
+
 } catch (error) {
   // report error
   console.log(error.message + '\n');
@@ -51,8 +58,8 @@ try {
 
 // use args...
 
-if (args.noPreserveRoot && args.force && args.files[0] === '/') {
-  console.log('Everything is awesome!');
+if (args.symbolic) {
+  // do something
 }
 ```
 
@@ -60,39 +67,46 @@ if (args.noPreserveRoot && args.force && args.files[0] === '/') {
 
 ### Options
 
-- id -
-- longId -
-- shortId -
-- description -
-- required -
-- many -
+The following properties are shared between options and option arguments:
+
+- longId - optional - If not provided, the option key (in camel-case) will be
+  converted into param-case, e.g. noPreserveRoot -> no-preserve-root
+- shortId - optional - If not provided, the first character of the option key
+  will be used in lower-case or upper-case forms (dependent on availability).
+  Conflicts between option short ID's will cause an error to be thrown.
+- required - optional - Defaults to false.
+- many - optional - Defaults to false. When false, the option may only be used
+  once, with multiple uses causing an error to be thrown. When true, the option
+  may be used more than once, with the number of uses captured in the parsed
+  result.
+- description - optional - Shown as part of the help text.
 
 The following additional properties are for option arguments:
 
-- name -
-- type -
-- default -
-- parse -
-- validate -
+- type - optional - If provided, must be either 'number' or 'string'. Supports
+  both signed and unsigned numbers.
+- default - optional - If provided, used to infer type (if type not provided). 
+- parse - optional - If provided, argument parsing will be delegated to it.
+- validate - optional - If provided, argument validation will be delegated to
+  it.
+- name - optional - Used to create the option argument signature that is shown
+  as part of the help text.
 
 ### Operands
 
-- id -
-- description -
 - required -
 - many -
-- name -
 - type -
 - default -
 - parse -
 - validate -
+- description -
+- name -
 
 ### Help
 
 - name -
 - banner -
-
-
 
 
 [npm-url]: https://npmjs.org/package/node-argv-parser

@@ -153,6 +153,72 @@ it('should handle signed number argument', function() {
   assert.strictEqual(result.foo, -42);
 });
 
+it('should defer parsing', function() {
+  var config = {
+    options: {
+      foo: {
+        type: 'string',
+        description: 'Test --foo',
+        parse: function (value) {
+          assert.equal(value, 'foo');
+          return 'bar';
+        }
+      }
+    }
+  };
+  var result = parse('-f foo'.split(' '), config);
+  assert.strictEqual(result.foo, 'bar');
+});
+
+it('should defer validation', function() {
+  var config = {
+    options: {
+      foo: {
+        type: 'string',
+        description: 'Test --foo',
+        validate: function (value) {
+          assert.equal(value, 'foo');
+          return true;
+        }
+      }
+    }
+  };
+  var result = parse('-f foo'.split(' '), config);
+  assert.strictEqual(result.foo, 'foo');
+});
+
+it('should defer validation following parse', function() {
+  var config = {
+    options: {
+      foo: {
+        type: 'number',
+        description: 'Test --foo',
+        validate: function (value) {
+          assert.equal(value, 42);
+        }
+      }
+    }
+  };
+  var result = parse('-f 42'.split(' '), config);
+  assert.strictEqual(result.foo, 42);
+});
+
+it('should fail deferred validation', function() {
+  var config = {
+    options: {
+      foo: {
+        type: 'number',
+        description: 'Test --foo',
+        validate: function () {
+          throw new Error();
+        }
+      }
+    }
+  };
+  assert.throws(function () {
+    parse('-f foo'.split(' '), config);
+  });
+});
 
 it('should apply default when option missing', function() {
   var config = {
