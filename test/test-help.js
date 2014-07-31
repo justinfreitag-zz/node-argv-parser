@@ -1,6 +1,6 @@
 'use strict';
 
-var parser = require('..');
+var parse = require('..');
 
 it('should dispaly help for specified config', function() {
   var config = {
@@ -51,6 +51,6 @@ it('should dispaly help for specified config', function() {
     }
   };
 
-  parser.parse(['-h'], config);
+  parse(['-h'], config);
 });
 

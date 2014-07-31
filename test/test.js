@@ -1,7 +1,7 @@
 'use strict';
 
 var assert = require('assert');
-var parser = require('..');
+var parse = require('..');
 
 it('should hande short option', function() {
   var config = {
@@ -11,7 +11,7 @@ it('should hande short option', function() {
       }
     }
   };
-  var result = parser.parse(['-f'], config);
+  var result = parse(['-f'], config);
   assert.equal(result.foo, true);
 });
 
@@ -24,7 +24,7 @@ it('should hande short option argument', function() {
       }
     }
   };
-  var result = parser.parse('-f bar'.split(' '), config);
+  var result = parse('-f bar'.split(' '), config);
   assert.equal(result.foo, 'bar');
 });
 
@@ -36,7 +36,7 @@ it('should hande long option', function() {
       }
     }
   };
-  var result = parser.parse(['-f'], config);
+  var result = parse(['-f'], config);
   assert.equal(result.foo, true);
 });
 
@@ -49,7 +49,7 @@ it('should hande long option argument', function() {
       }
     }
   };
-  var result = parser.parse('-f bar'.split(' '), config);
+  var result = parse('-f bar'.split(' '), config);
   assert.equal(result.foo, 'bar');
 });
 
@@ -62,7 +62,7 @@ it('should handle short option with assigned argument', function() {
       }
     }
   };
-  var result = parser.parse(['-f=42'], config);
+  var result = parse(['-f=42'], config);
   assert.equal(result.foo, 42);
 });
 
@@ -75,7 +75,7 @@ it('should handle short option with adjacent argument', function() {
       }
     }
   };
-  var result = parser.parse(['-f42'], config);
+  var result = parse(['-f42'], config);
   assert.equal(result.foo, 42);
 });
 
@@ -88,7 +88,7 @@ it('should handle long option with assigned argument', function() {
       }
     }
   };
-  var result = parser.parse(['--foo=42'], config);
+  var result = parse(['--foo=42'], config);
   assert.equal(result.foo, 42);
 });
 
@@ -102,13 +102,13 @@ it('should fail when long option missing argument', function() {
     }
   };
   assert.throws(function () {
-    parser.parse(['--foo'], config);
+    parse(['--foo'], config);
   });
 });
 
 it('should fail when unknown option specified', function() {
   assert.throws(function () {
-    parser.parse(['-f']);
+    parse(['-f']);
   });
 });
 
@@ -122,7 +122,7 @@ it('should fail when short option missing argument', function() {
     }
   };
   assert.throws(function () {
-    parser.parse(['-f'], config);
+    parse(['-f'], config);
   });
 });
 
@@ -136,7 +136,7 @@ it('should fail when invalid argument specified', function() {
     }
   };
   assert.throws(function () {
-    parser.parse('-f bar'.split(' '), config);
+    parse('-f bar'.split(' '), config);
   });
 });
 
@@ -149,7 +149,7 @@ it('should handle signed number argument', function() {
       }
     }
   };
-  var result = parser.parse('-f -42'.split(' '), config);
+  var result = parse('-f -42'.split(' '), config);
   assert.strictEqual(result.foo, -42);
 });
 
@@ -164,7 +164,7 @@ it('should apply default when option missing', function() {
       }
     }
   };
-  var result = parser.parse([], config);
+  var result = parse([], config);
   assert.equal(result.foo, 42);
 });
 
@@ -178,7 +178,7 @@ it('should fail on default/type mismatch', function() {
     }
   };
   assert.throws(function () {
-    parser.parse('-f bar'.split(' '), config);
+    parse('-f bar'.split(' '), config);
   });
 });
 
@@ -193,7 +193,7 @@ it('should fail on required and default property mismatch', function() {
     }
   };
   assert.throws(function () {
-    parser.parse([], config);
+    parse([], config);
   });
 });
 
@@ -206,7 +206,7 @@ it('should fail on unknown option property', function() {
     }
   };
   assert.throws(function () {
-    parser.parse([], config);
+    parse([], config);
   });
 });
 
@@ -219,7 +219,7 @@ it('should handle option argument with implied type', function() {
       }
     }
   };
-  var result = parser.parse('-f 43'.split(' '), config);
+  var result = parse('-f 43'.split(' '), config);
   assert.equal(result.foo, 43);
 });
 
@@ -232,7 +232,7 @@ it('should handle condensed option array type', function() {
       }
     }
   };
-  var result = parser.parse(['-fff'], config);
+  var result = parse(['-fff'], config);
   assert.equal(result.foo, 3);
 });
 
@@ -245,7 +245,7 @@ it('should handle separated option array type', function() {
       }
     }
   };
-  var result = parser.parse('-f -f -f'.split(' '), config);
+  var result = parse('-f -f -f'.split(' '), config);
   assert.equal(result.foo, 3);
 });
 
@@ -258,7 +258,7 @@ it('should handle option argument with implied array type', function() {
       }
     }
   };
-  var result = parser.parse('-f bar 42'.split(' '), config);
+  var result = parse('-f bar 42'.split(' '), config);
   assert.deepEqual(result.foo, ['bar', '42']);
 });
 
@@ -272,7 +272,7 @@ it('should fail on empty default array', function() {
     }
   };
   assert.throws(function () {
-    parser.parse([], config);
+    parse([], config);
   });
 });
 
@@ -286,7 +286,7 @@ it('should fail on unknown default value type', function() {
     }
   };
   assert.throws(function () {
-    parser.parse([], config);
+    parse([], config);
   });
 });
 
@@ -301,7 +301,7 @@ it('should handle condensed short options', function() {
       },
     }
   };
-  var result = parser.parse(['-fb'], config);
+  var result = parse(['-fb'], config);
   assert.equal(result.foo, true);
   assert.equal(result.bar, true);
 });
@@ -318,7 +318,7 @@ it('should handle condensed short options with adjacent argument', function() {
       },
     }
   };
-  var result = parser.parse(['-fb42'], config);
+  var result = parse(['-fb42'], config);
   assert.equal(result.foo, true);
   assert.equal(result.bar, 42);
 });
@@ -335,7 +335,7 @@ it('should handle condensed short options with assignment', function() {
       },
     }
   };
-  var result = parser.parse(['-fb=42'], config);
+  var result = parse(['-fb=42'], config);
   assert.equal(result.foo, true);
   assert.equal(result.bar, 42);
 });
@@ -352,7 +352,7 @@ it('should handle condensed short options separate argument', function() {
       },
     }
   };
-  var result = parser.parse(['-fb 42'], config);
+  var result = parse(['-fb 42'], config);
   assert.equal(result.foo, true);
   assert.equal(result.bar, 42);
 });
@@ -369,7 +369,7 @@ it('should handle assignment inside condensed short options', function() {
       },
     }
   };
-  var result = parser.parse(['-fb4=2'], config);
+  var result = parse(['-fb4=2'], config);
   assert.equal(result.foo, true);
   assert.equal(result.bar, '4=2');
 });
@@ -387,7 +387,7 @@ it('should fail when condensed short options missing argument', function() {
     }
   };
   assert.throws(function () {
-    parser.parse(['-fb'], config);
+    parse(['-fb'], config);
   });
 });
 
@@ -401,7 +401,7 @@ it('should handle mutiple arguments', function() {
       }
     }
   };
-  var result = parser.parse('-f foo bar'.split(' '), config);
+  var result = parse('-f foo bar'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -415,7 +415,7 @@ it('should handle mutiple arguments with adjacency', function() {
       }
     }
   };
-  var result = parser.parse('-ffoo bar'.split(' '), config);
+  var result = parse('-ffoo bar'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -429,7 +429,7 @@ it('should handle mutiple arguments with assignment', function() {
       }
     }
   };
-  var result = parser.parse('-f=foo bar'.split(' '), config);
+  var result = parse('-f=foo bar'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -443,7 +443,7 @@ it('should handle comma separated arguments', function() {
       }
     }
   };
-  var result = parser.parse('-f foo,bar'.split(' '), config);
+  var result = parse('-f foo,bar'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -457,7 +457,7 @@ it('should handle comma separated arguments with adjacency', function() {
       }
     }
   };
-  var result = parser.parse('-ffoo,bar'.split(' '), config);
+  var result = parse('-ffoo,bar'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -471,7 +471,7 @@ it('should handle comma separated arguments with assignment', function() {
       }
     }
   };
-  var result = parser.parse('-f=foo,bar'.split(' '), config);
+  var result = parse('-f=foo,bar'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -485,7 +485,7 @@ it('should handle comma separated argument mix', function() {
       }
     }
   };
-  var result = parser.parse('-f=foo,bar 42'.split(' '), config);
+  var result = parse('-f=foo,bar 42'.split(' '), config);
   assert.deepEqual(result.foo, ['foo', 'bar', '42']);
 });
 
@@ -499,12 +499,12 @@ it('should handle many flag with single argument', function() {
       }
     }
   };
-  var result = parser.parse('-f bar'.split(' '), config);
+  var result = parse('-f bar'.split(' '), config);
   assert.deepEqual(result.foo, ['bar']);
 });
 
 it('should handle operands with default config', function() {
-  var result = parser.parse(['42']);
+  var result = parse(['42']);
   assert.equal(result.argv[0], '42');
 });
 
@@ -518,7 +518,7 @@ it('should fail on invalid operand type', function() {
     }
   };
   assert.throws(function () {
-    parser.parse(['foo'], config);
+    parse(['foo'], config);
   });
 });
 
@@ -531,7 +531,7 @@ it('should fail on invalid operand type', function() {
     }
   };
   assert.throws(function () {
-    parser.parse('foo bar'.split(' '), config);
+    parse('foo bar'.split(' '), config);
   });
 });
 
@@ -547,13 +547,13 @@ it('should handle single and many operand mix', function() {
       }
     }
   };
-  var result = parser.parse('42 foo bar'.split(' '), config);
+  var result = parse('42 foo bar'.split(' '), config);
   assert.equal(result.foo, 42);
   assert.deepEqual(result.bar, ['foo', 'bar']);
 });
 
 it('should add arguments after terminator to default operand', function() {
-  var result = parser.parse('-- -f'.split(' '));
+  var result = parse('-- -f'.split(' '));
   assert.deepEqual(result.argv, ['-f']);
 });
 
@@ -567,7 +567,7 @@ it('should fail with unexpected operand', function() {
     }
   };
   assert.throws(function () {
-    parser.parse('foo bar'.split(' '), config);
+    parse('foo bar'.split(' '), config);
   });
 });
 
@@ -579,7 +579,7 @@ it('should handle operand with default type', function() {
       }
     }
   };
-  var result = parser.parse(['foo'], config);
+  var result = parse(['foo'], config);
   assert.deepEqual(result.foo, 'foo');
 });
 
@@ -592,7 +592,7 @@ it('should handle operand with implied type', function() {
       }
     }
   };
-  var result = parser.parse(['43'], config);
+  var result = parse(['43'], config);
   assert.deepEqual(result.foo, 43);
 });
 
@@ -606,7 +606,7 @@ it('should handle comma separated operands', function() {
       }
     }
   };
-  var result = parser.parse(['foo,bar'], config);
+  var result = parse(['foo,bar'], config);
   assert.deepEqual(result.foo, ['foo', 'bar']);
 });
 
@@ -619,7 +619,7 @@ it('should handle escaped option argument', function() {
       }
     }
   };
-  var result = parser.parse('-f "foo,bar"'.split(' '), config);
+  var result = parse('-f "foo,bar"'.split(' '), config);
   assert.deepEqual(result.foo, 'foo,bar');
 });
 
@@ -632,7 +632,7 @@ it('should handle escaped operands', function() {
       }
     }
   };
-  var result = parser.parse(['"foo,bar"'], config);
+  var result = parse(['"foo,bar"'], config);
   assert.deepEqual(result.foo, 'foo,bar');
 });
 
@@ -647,7 +647,7 @@ it('should fail when missing required operand', function() {
     }
   };
   assert.throws(function () {
-    parser.parse([], config);
+    parse([], config);
   });
 });
 
@@ -661,7 +661,7 @@ it('should fail when missing required option', function() {
     }
   };
   assert.throws(function () {
-    parser.parse([], config);
+    parse([], config);
   });
 });
 

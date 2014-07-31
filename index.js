@@ -18,7 +18,6 @@ var META_PROPERTIES = [
 
 var ARGUMENT_TYPES = [
   'string',
-  'boolean',
   'number'
 ];
 
@@ -422,7 +421,11 @@ function mergeConfig(config) {
   return config;
 }
 
-exports.parse = function (argv, config) {
+module.exports = function (argv, config) {
+  if (!(argv instanceof Array)) {
+    config = argv;
+    argv = null;
+  }
   config = mergeConfig(config);
 
   var args = (argv || process.argv).slice().reverse();
