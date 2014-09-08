@@ -1,7 +1,7 @@
 # node-argv-parser [![NPM version][npm-image]][npm-url] [![Build Status][travis-image]][travis-url] [![Dependency Status][depstat-image]][depstat-url]
 
 **node-argv-parser** is a friendly process.argv parser for [Node.js][nodejs]. It
-adheres to the [UNIX Utility Conventions][utility-conventions].
+adheres to the [UNIX utility conventions][utility-conventions].
 
 ## Usage
 
@@ -65,15 +65,18 @@ if (args.symbolic) {
 
 ## Configuration
 
-### Options
+The following properties are specific to options and option arguments:
 
-The following properties are shared between options and option arguments:
-
-- longId - optional - If not provided, the option key (in camel-case) will be
-  converted into param-case, e.g. noPreserveRoot -> no-preserve-root
+- longId - optional - If not provided, the option key (which is assumed to be in
+  camel-case form) will be converted into param-case, e.g. noPreserveRoot ->
+  no-preserve-root
 - shortId - optional - If not provided, the first character of the option key
   will be used in lower-case or upper-case forms (dependent on availability).
   Conflicts between option short ID's will cause an error to be thrown.
+
+The following properties are applicable to options, option arguments, and
+operands:
+
 - required - optional - Defaults to false.
 - many - optional - Defaults to false. When false, the option may only be used
   once, with multiple uses causing an error to be thrown. When true, the option
@@ -83,31 +86,20 @@ The following properties are shared between options and option arguments:
 
 The following additional properties are for option arguments:
 
-- type - optional - If provided, must be either 'number' or 'string'. Supports
-  both signed and unsigned numbers.
-- default - optional - If provided, used to infer type (if type not provided). 
-- parse - optional - If provided, argument parsing will be delegated to it.
+- type - required unless a default is provided - If provided, must be either
+  'number' or 'string'. Supports both signed and unsigned numbers.
+- default - optional - If provided, may be used to infer type (if type not
+  provided).
+- parse - optional - If provided, argument parsing will be delegated.
 - validate - optional - If provided, argument validation will be delegated to
   it.
 - name - optional - Used to create the option argument signature that is shown
   as part of the help text.
 
-### Operands
-
-- required -
-- many -
-- type -
-- default -
-- parse -
-- validate -
-- description -
-- name -
-
 ### Help
 
 - name -
 - banner -
-
 
 [npm-url]: https://npmjs.org/package/node-argv-parser
 [npm-image]: https://badge.fury.io/js/node-argv-parser

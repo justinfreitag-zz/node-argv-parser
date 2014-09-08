@@ -211,7 +211,7 @@ function expandLongOption(arg, args, optionCache) {
   var option = optionCache[arg];
 
   if (!option) {
-    throw new Error(format(INVALID_OPTION(arg)));
+    throw new Error(format(INVALID_OPTION, arg));
   }
 
   return option.shortId;

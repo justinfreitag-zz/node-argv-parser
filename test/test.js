@@ -588,7 +588,7 @@ it('should fail on invalid operand type', function() {
   });
 });
 
-it('should fail on invalid operand type', function() {
+it('should fail on unknown operand', function() {
   var config = {
     operands: {
       foo: {
@@ -637,7 +637,7 @@ it('should fail with unexpected operand', function() {
   });
 });
 
-it('should handle operand with default type', function() {
+it('should handle non-numeric operand without type as string', function() {
   var config = {
     operands: {
       foo: {
@@ -646,7 +646,19 @@ it('should handle operand with default type', function() {
     }
   };
   var result = parse(['foo'], config);
-  assert.deepEqual(result.foo, 'foo');
+  assert.equal(result.foo, 'foo');
+});
+
+it('should handle numeric operand without type as string', function() {
+  var config = {
+    operands: {
+      foo: {
+        description: 'Test --foo'
+      }
+    }
+  };
+  var result = parse(['42'], config);
+  assert.equal(typeof result.foo, 'string');
 });
 
 it('should handle operand with implied type', function() {
